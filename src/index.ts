@@ -36,8 +36,8 @@ const server = app.listen(config.port, () => {
   console.log(`🚀 小说服务器启动成功！`);
   console.log(`📡 服务地址: http://localhost:${config.port}`);
   console.log(`💬 聊天接口: http://localhost:${config.port}/api/chat`);
-  console.log(`🔍 健康检查: http://localhost:${config.port}/health`);
-  console.log(`📋 模型列表: http://localhost:${config.port}/api/models`);
+
+
 });
 
 // 优雅关闭

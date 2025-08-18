@@ -13,15 +13,21 @@
   "files": [
     "build"
   ],
-  "keywords": ["chat", "openai", "character", "roleplay"],
+  "keywords": [
+    "chat",
+    "openai",
+    "character",
+    "roleplay"
+  ],
   "author": "",
   "license": "ISC",
   "description": "简单的聊天服务器，支持角色卡功能",
   "dependencies": {
-    "@supabase/supabase-js": "^2.55.0",
+    "@langchain/core": "^0.3.71",
+    "@langchain/openai": "^0.6.7",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "openai": "^5.12.2"
+    "langchain": "^0.3.30"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",

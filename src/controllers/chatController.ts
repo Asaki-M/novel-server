@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import openaiService from '../services/openaiService.js';
+import langchainService from '../services/langchainService.js';
 import characterService from '../services/characterService.js';
 import { ChatRequest, ChatResponse, ApiResponse } from '../types/chat.js';
 import { CreateCharacterRequest, UpdateCharacterRequest } from '../types/character.js';
@@ -51,74 +51,57 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
     }
 
     // 调用AI
-    const completion = stream 
-      ? await openaiService.createChatCompletion(messagesForAI, {
-          temperature,
-          max_tokens,
-          stream: true
-        })
-      : await openaiService.createChatCompletion(messagesForAI, {
-          temperature,
-          max_tokens,
-          stream: false
-        });
-
     if (stream) {
-      // 流式响应处理
+      // 流式响应
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       });
 
-      for await (const chunk of completion) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      for await (const delta of langchainService.stream(messagesForAI, {
+        temperature,
+        max_tokens,
+      })) {
+        if (delta) {
+          res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
         }
       }
-      
+
       res.write('data: [DONE]\n\n');
       res.end();
-    } else {
-      // 常规响应
-      const response = completion.choices[0]?.message?.content || '';
-
-      const result: ChatResponse = {
-        success: true,
-        message: characterInfo 
-          ? `${characterInfo.name} 回复成功`
-          : '聊天响应成功',
-        data: {
-          response: response,
-          character: characterInfo, // 返回使用的角色信息
-          usage: completion.usage ? {
-            prompt_tokens: completion.usage.prompt_tokens,
-            completion_tokens: completion.usage.completion_tokens,
-            total_tokens: completion.usage.total_tokens
-          } : undefined
-        }
-      };
-
-      res.json(result);
+      return;
     }
+
+    const { content, usage } = await langchainService.invoke(messagesForAI, {
+      temperature,
+      max_tokens,
+    });
+
+    // 常规响应
+    const result: ChatResponse = {
+      success: true,
+      message: characterInfo 
+        ? `${characterInfo.name} 回复成功`
+        : '聊天响应成功',
+      data: {
+        response: content,
+        character: characterInfo,
+        usage: usage ? {
+          prompt_tokens: usage.prompt_tokens ?? 0,
+          completion_tokens: usage.completion_tokens ?? 0,
+          total_tokens: usage.total_tokens ?? 0,
+        } : undefined,
+      }
+    };
+
+    res.json(result);
   } catch (error) {
     next(error);
   }
 };
 
-export const getModels = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const models = await openaiService.getModels();
-    const response: ApiResponse = {
-      success: true,
-      data: models.data.filter(model => model.id.includes('qwen'))
-    };
-    res.json(response);
-  } catch (error) {
-    next(error);
-  }
-};
+
 
 // ==================== 角色卡管理 ====================
 
