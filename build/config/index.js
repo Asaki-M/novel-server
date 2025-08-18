@@ -12,21 +12,12 @@ const config = {
         name: 'Novel Server Chat API',
         referer: process.env.APP_REFERER || 'http://localhost:3000',
     },
-    features: {
-        // 默认关闭向量记忆(避免产生OpenAI embedding费用)
-        vectorMemory: process.env.ENABLE_VECTOR_MEMORY === 'true',
-    },
 };
 // 验证必需的配置
 export function validateConfig() {
     if (!config.openrouter.apiKey) {
         throw new Error('OPENROUTER_API_KEY is required');
     }
-    if (config.features.vectorMemory) {
-        console.warn('⚠️  向量记忆功能已启用，将产生 OpenAI embedding 费用');
-    }
-    else {
-        console.log('💰 向量记忆功能已关闭，使用完全免费模式');
-    }
+    console.log('✅ 配置验证通过，使用纯聊天模式');
 }
 export default config;

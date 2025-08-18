@@ -21,11 +21,6 @@ export interface ChatResponse {
       avatar?: string;
       category: string;
     };
-    memoryContext?: {
-      relevantChunks: number;
-      plotSummary: string;
-      activeCharacters: string[];
-    };
     usage?: {
       prompt_tokens: number;
       completion_tokens: number;

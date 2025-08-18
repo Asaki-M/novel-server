@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@pinecone-database/pinecone':
-        specifier: ^6.1.2
-        version: 6.1.2
       '@supabase/supabase-js':
         specifier: ^2.55.0
         version: 2.55.0
@@ -35,10 +32,6 @@ importers:
         version: 5.9.2
 
 packages:
-
-  '@pinecone-database/pinecone@6.1.2':
-    resolution: {integrity: sha512-ydIlbtgIIHFgBL08sPzua5ckmOgtjgDz8xg21CnP1fqnnEgDmOlnfd10MRKU+fvFRhDlh4Md37SwZDr0d4cBqg==}
-    engines: {node: '>=18.0.0'}
 
   '@supabase/auth-js@2.71.1':
     resolution: {integrity: sha512-mMIQHBRc+SKpZFRB2qtupuzulaUhFYupNyxqDj5Jp/LyPvcWvjaJzZzObv6URtL/O6lPxkanASnotGtNpS3H2Q==}
@@ -409,8 +402,6 @@ packages:
         optional: true
 
 snapshots:
-
-  '@pinecone-database/pinecone@6.1.2': {}
 
   '@supabase/auth-js@2.71.1':
     dependencies:

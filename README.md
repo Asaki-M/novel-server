@@ -1,13 +1,12 @@
-# 小说服务器 - 聊天接口
+# 聊天服务器 - 角色卡聊天系统
 
-基于 OpenRouter Qwen3-14B 模型的聊天接口服务器。
+基于 OpenRouter Qwen3-14B 模型的简洁聊天接口服务器，支持角色卡功能。
 
 ## 功能特性
 
 - 🤖 集成 OpenRouter 的 Qwen3-14B 免费模型
 - 💬 支持对话聊天功能
 - 🎭 **角色卡系统** - 自定义AI角色和人格
-- 🧠 智能向量记忆库 (可选，需付费)
 - 🌊 支持流式和非流式响应
 - 🔒 完整的错误处理和验证
 - 📊 Token 使用统计
@@ -24,13 +23,7 @@ pnpm install
 
 ### 2. 配置环境变量
 
-复制 `env.example` 文件并重命名为 `.env`：
-
-```bash
-cp env.example .env
-```
-
-编辑 `.env` 文件，填入你的 OpenRouter API 密钥：
+创建 `.env` 文件：
 
 ```env
 OPENROUTER_API_KEY=你的_OpenRouter_API_密钥
@@ -69,8 +62,6 @@ pnpm start
 |--------|------|------|--------|------|
 | `messages` | `Array<ChatMessage>` | ✅ | - | 对话消息列表 |
 | `characterId` | `string` | ❌ | - | 🎭 **角色卡ID** |
-| `sessionId` | `string` | ❌ | - | 会话ID (启用记忆) |
-| `useMemory` | `boolean` | ❌ | `false` | 是否启用记忆功能 |
 | `temperature` | `number` | ❌ | `0.7` | 控制回复的随机性 (0-2) |
 | `max_tokens` | `number` | ❌ | `2048` | 最大输出token数 |
 | `stream` | `boolean` | ❌ | `false` | 是否启用流式响应 |
@@ -111,21 +102,6 @@ pnpm start
 }
 ```
 
-**带记忆的聊天**：
-```json
-{
-  "messages": [
-    {
-      "role": "user",
-      "content": "继续之前的故事情节"
-    }
-  ],
-  "sessionId": "session_uuid",
-  "useMemory": true,
-  "characterId": "character_uuid"
-}
-```
-
 **响应格式**
 
 ```json
@@ -139,11 +115,6 @@ pnpm start
       "name": "霸道总裁",
       "avatar": "💼",
       "category": "roleplay"
-    },
-    "memoryContext": {
-      "relevantChunks": 3,
-      "plotSummary": "当前故事进展...",
-      "activeCharacters": ["林总", "秘书小王"]
     },
     "usage": {
       "prompt_tokens": 25,
@@ -268,19 +239,11 @@ data: [DONE]
 - **DELETE** `/api/characters/:id` - 删除角色卡
 - **GET** `/api/characters/stats` - 获取统计信息
 
-### 4. 会话管理接口
-
-**会话用于开启记忆功能**
-
-- **POST** `/api/sessions` - 创建记忆会话
-- **GET** `/api/sessions/:id` - 获取会话信息  
-- **DELETE** `/api/sessions/:id` - 删除会话
-
-### 5. 模型列表接口
+### 4. 模型列表接口
 
 **GET** `/api/models` - 获取可用的 AI 模型列表
 
-### 6. 错误响应
+### 5. 错误响应
 
 所有接口在出错时都返回统一的错误格式：
 
@@ -303,14 +266,14 @@ data: [DONE]
 
 ## 🧪 测试
 
-我们提供了完整的API测试脚本来验证所有接口功能：
+我们提供了API测试脚本来验证接口功能：
 
 ```bash
 # 启动服务器
-npm run dev
+pnpm run dev
 
 # 在新终端窗口运行测试
-node scripts/test-api.js
+pnpm test
 ```
 
 **测试内容包括：**
@@ -318,30 +281,6 @@ node scripts/test-api.js
 - ✅ 模型列表接口  
 - ✅ 聊天接口 (正常流程)
 - ✅ 错误处理机制
-
-**预期输出：**
-```
-🧪 开始测试 API...
-
-🔍 测试健康检查...
-✅ 健康检查通过
-📊 服务运行时间: 120秒
-
-📋 测试模型列表...
-✅ 模型列表获取成功
-📝 可用模型数量: 1
-
-💬 测试聊天接口...
-✅ 聊天接口测试成功
-🤖 AI回复: 你好！很高兴为你服务...
-📊 Token使用: { prompt_tokens: 8, completion_tokens: 12, total_tokens: 20 }
-
-🚫 测试错误处理...
-✅ 错误处理测试成功
-📝 错误信息: 请提供有效的消息数组
-
-🎉 所有测试完成！
-```
 
 ## 🎭 角色卡系统使用指南
 
@@ -440,24 +379,6 @@ roleplayChat('帮我处理这个项目', 'domineering_ceo_id').then(result => {
 });
 ```
 
-**记忆模式聊天**：
-```javascript
-async function memoryChat(sessionId, message, characterId = null) {
-  const response = await fetch('http://localhost:3000/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: [{ role: 'user', content: message }],
-      sessionId: sessionId,
-      useMemory: true,
-      characterId: characterId
-    })
-  });
-  
-  return await response.json();
-}
-```
-
 ### cURL
 
 ```bash
@@ -533,8 +454,10 @@ novel-server/
 │   │   ├── healthRoutes.ts
 │   │   └── index.ts
 │   ├── services/        # 服务层
+│   │   ├── characterService.ts
 │   │   └── openaiService.ts
 │   ├── types/           # 类型定义
+│   │   ├── character.ts
 │   │   └── chat.ts
 │   └── index.ts         # 应用入口
 ├── scripts/             # 工具脚本

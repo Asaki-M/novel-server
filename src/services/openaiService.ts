@@ -49,7 +49,6 @@ class OpenAIService {
       "HTTP-Referer": config.app.referer,
       "X-Title": config.app.name,
     };
-
     if (stream) {
       return this.client.chat.completions.create({
         ...baseParams,
