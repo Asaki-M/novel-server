@@ -2,7 +2,9 @@ import langchainService from '../services/langchainService.js';
 import characterService from '../services/characterService.js';
 export const chat = async (req, res, next) => {
     try {
-        const { messages, temperature, max_tokens, stream, characterId // 可选：角色卡ID
+        const { messages, temperature, max_tokens, stream, characterId, // 可选：角色卡ID
+        sessionId, // 可选：会话ID（启用记忆时使用）
+        useMemory // 可选：是否启用记忆
          } = req.body;
         // 验证基本参数
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -14,14 +16,18 @@ export const chat = async (req, res, next) => {
             return;
         }
         let messagesForAI = messages;
+        let systemPrompt = undefined;
         let characterInfo = undefined;
         // 处理角色卡
         if (characterId) {
             const character = await characterService.getCharacter(characterId);
             if (character) {
-                // 将角色的system prompt插入到消息开头
-                const systemMessage = { role: 'system', content: character.systemPrompt };
-                messagesForAI = [systemMessage, ...messages];
+                systemPrompt = character.systemPrompt;
+                // 非记忆模式下，仍然把system注入到消息开头
+                if (!useMemory) {
+                    const systemMessage = { role: 'system', content: character.systemPrompt };
+                    messagesForAI = [systemMessage, ...messages];
+                }
                 characterInfo = {
                     id: character.id,
                     name: character.name,
@@ -42,16 +48,60 @@ export const chat = async (req, res, next) => {
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
             });
-            for await (const delta of langchainService.stream(messagesForAI, {
-                temperature,
-                max_tokens,
-            })) {
-                if (delta) {
-                    res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+            if (useMemory) {
+                for await (const delta of langchainService.streamWithMemory(messages, {
+                    temperature,
+                    max_tokens,
+                    systemPrompt,
+                    sessionId,
+                    summaryWindow: 12,
+                    summaryMaxTokens: 400,
+                })) {
+                    if (delta) {
+                        res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+                    }
+                }
+            }
+            else {
+                for await (const delta of langchainService.stream(messagesForAI, {
+                    temperature,
+                    max_tokens,
+                })) {
+                    if (delta) {
+                        res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+                    }
                 }
             }
             res.write('data: [DONE]\n\n');
             res.end();
+            return;
+        }
+        // 非流式
+        if (useMemory) {
+            const { content, usage } = await langchainService.invokeWithMemory(messages, {
+                temperature,
+                max_tokens,
+                systemPrompt,
+                sessionId,
+                summaryWindow: 12,
+                summaryMaxTokens: 400,
+            });
+            const result = {
+                success: true,
+                message: characterInfo
+                    ? `${characterInfo.name} 回复成功`
+                    : '记忆聊天响应成功',
+                data: {
+                    response: content,
+                    character: characterInfo,
+                    usage: usage ? {
+                        prompt_tokens: usage.prompt_tokens ?? 0,
+                        completion_tokens: usage.completion_tokens ?? 0,
+                        total_tokens: usage.total_tokens ?? 0,
+                    } : undefined,
+                }
+            };
+            res.json(result);
             return;
         }
         const { content, usage } = await langchainService.invoke(messagesForAI, {
