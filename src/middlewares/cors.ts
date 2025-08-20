@@ -1,13 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 
-export const corsMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
+export const corsMiddleware = (req: any, res: any, next: any): void => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+  if (String(req.method || '').toUpperCase() === 'OPTIONS') {
+    res.status(200).end();
+    return;
   }
+
+  next();
 }; 

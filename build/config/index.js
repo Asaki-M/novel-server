@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 // 加载环境变量
 dotenv.config();
 const config = {
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: parseInt(process.env.PORT || '3008', 10),
     openrouter: {
         apiKey: process.env.OPENROUTER_API_KEY || '',
         baseUrl: 'https://openrouter.ai/api/v1',
