@@ -17,7 +17,7 @@ interface Config {
 }
 
 const config: Config = {
-  port: parseInt(process.env.PORT || '3000', 10),
+  port: parseInt(process.env.PORT || '3008', 10),
   openrouter: {
     apiKey: process.env.OPENROUTER_API_KEY || '',
     baseUrl: 'https://openrouter.ai/api/v1',
