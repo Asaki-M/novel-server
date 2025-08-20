@@ -17,15 +17,15 @@ interface Config {
 }
 
 const config: Config = {
-  port: parseInt(process.env.PORT || '3008', 10),
+  port: parseInt(process.env['PORT'] ?? '3008', 10),
   openrouter: {
-    apiKey: process.env.OPENROUTER_API_KEY || '',
+    apiKey: process.env['OPENROUTER_API_KEY'] ?? '',
     baseUrl: 'https://openrouter.ai/api/v1',
-    model: process.env.OPENROUTER_MODEL || 'qwen/qwen3-14b:free',
+    model: process.env['OPENROUTER_MODEL'] ?? 'qwen/qwen3-14b:free',
   },
   app: {
     name: 'Novel Server Chat API',
-    referer: process.env.APP_REFERER || 'http://localhost:3000',
+    referer: process.env['APP_REFERER'] ?? 'http://localhost:3000',
   },
 };
 

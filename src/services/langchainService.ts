@@ -5,12 +5,12 @@ import { ChatMessage } from "../types/chat.js";
 import supabase from "../config/supabase.js";
 
 export interface LangChainCallOptions {
-	temperature?: number;
-	max_tokens?: number;
-	systemPrompt?: string;
-	sessionId?: string;
-	summaryWindow?: number;
-	summaryMaxTokens?: number;
+	temperature?: number | undefined;
+	max_tokens?: number | undefined;
+	systemPrompt?: string | undefined;
+	sessionId?: string | undefined;
+	summaryWindow?: number | undefined;
+	summaryMaxTokens?: number | undefined;
 }
 
 function toLangChainMessages(messages: ChatMessage[], systemPrompt?: string): BaseMessage[] {
@@ -39,12 +39,11 @@ function resolveContent(content: unknown): string {
 }
 
 class LangChainService {
-	private createModel(opts: { temperature?: number; max_tokens?: number }) {
-		return new ChatOpenAI({
+	private createModel(opts: { temperature?: number | undefined; max_tokens?: number | undefined }) {
+		const init: any = {
 			apiKey: config.openrouter.apiKey,
 			model: config.openrouter.model,
 			temperature: opts.temperature ?? 0.7,
-			maxTokens: opts.max_tokens,
 			configuration: {
 				baseURL: config.openrouter.baseUrl,
 				defaultHeaders: {
@@ -52,7 +51,11 @@ class LangChainService {
 					"X-Title": config.app.name,
 				},
 			},
-		});
+		};
+		if (typeof opts.max_tokens === "number") {
+			init.maxTokens = opts.max_tokens;
+		}
+		return new ChatOpenAI(init);
 	}
 
 	// ========= 基础无记忆 =========
@@ -100,7 +103,7 @@ class LangChainService {
 		const text = messages.map((m) => `${m.role}: ${m.content}`).join("\n");
 		const prompt = `请用尽量精炼的中文总结以下多轮对话的关键信息（人物、意图、事实、待办、上下文前提），限制在约200字内：\n\n${text}`;
 		const { content } = await this.invoke([{ role: "user", content: prompt }], {
-			systemPrompt,
+			...(systemPrompt ? { systemPrompt } : {}),
 			max_tokens: maxTokens,
 			temperature: 0.2,
 		});
@@ -109,7 +112,7 @@ class LangChainService {
 
 	private async buildMessagesWithMemory(input: ChatMessage[], opts: LangChainCallOptions): Promise<{ sessionId?: string; combined: ChatMessage[] }> {
 		const sessionId = opts.sessionId;
-		if (!sessionId) return { sessionId, combined: input };
+		if (!sessionId) return { combined: input };
 
 		const history = await this.getHistory(sessionId);
 		const combined: ChatMessage[] = [];
@@ -136,7 +139,7 @@ class LangChainService {
 	async invokeWithMemory(messages: ChatMessage[], options: LangChainCallOptions) {
 		const { temperature, max_tokens } = options;
 		const { sessionId, combined } = await this.buildMessagesWithMemory(messages, options);
-		const result = await this.invoke(combined, { temperature, max_tokens });
+		const result = await this.invoke(combined, { ...(typeof temperature === 'number' ? { temperature } : {}), ...(typeof max_tokens === 'number' ? { max_tokens } : {}) });
 
 		// 落库：追加本轮 user/assistant
 		if (sessionId) {

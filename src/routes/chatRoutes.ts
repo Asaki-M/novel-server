@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Router as ExpressRouter } from 'express';
 import { 
   chat, 
 
@@ -9,7 +9,7 @@ import {
   deleteCharacter
 } from '../controllers/chatController.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // 聊天接口
 router.post('/chat', chat);

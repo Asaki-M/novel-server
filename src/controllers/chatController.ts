@@ -48,8 +48,8 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
         characterInfo = {
           id: character.id,
           name: character.name,
-          avatar: character.avatar,
           category: 'custom',
+          ...(character.avatar ? { avatar: character.avatar } : {}),
         };
 
         console.log('🎭 使用角色卡:', character.name);
@@ -69,10 +69,10 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
 
       if (useMemory) {
         for await (const delta of langchainService.streamWithMemory(messages, {
-          temperature,
-          max_tokens,
-          systemPrompt,
-          sessionId,
+          ...(typeof temperature === 'number' ? { temperature } : {}),
+          ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
+          ...(systemPrompt ? { systemPrompt } : {}),
+          ...(sessionId ? { sessionId } : {}),
           summaryWindow: 12,
           summaryMaxTokens: 400,
         })) {
@@ -82,8 +82,8 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
         }
       } else {
         for await (const delta of langchainService.stream(messagesForAI, {
-          temperature,
-          max_tokens,
+          ...(typeof temperature === 'number' ? { temperature } : {}),
+          ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
         })) {
           if (delta) {
             res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
@@ -99,10 +99,10 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
     // 非流式
     if (useMemory) {
       const { content, usage } = await langchainService.invokeWithMemory(messages, {
-        temperature,
-        max_tokens,
-        systemPrompt,
-        sessionId,
+        ...(typeof temperature === 'number' ? { temperature } : {}),
+        ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
+        ...(systemPrompt ? { systemPrompt } : {}),
+        ...(sessionId ? { sessionId } : {}),
         summaryWindow: 12,
         summaryMaxTokens: 400,
       });
@@ -114,12 +114,14 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
           : '记忆聊天响应成功',
         data: {
           response: content,
-          character: characterInfo,
-          usage: usage ? {
-            prompt_tokens: usage.prompt_tokens ?? 0,
-            completion_tokens: usage.completion_tokens ?? 0,
-            total_tokens: usage.total_tokens ?? 0,
-          } : undefined,
+          ...(characterInfo ? { character: characterInfo } : {}),
+          ...(usage ? { 
+            usage: {
+              prompt_tokens: usage.prompt_tokens ?? 0,
+              completion_tokens: usage.completion_tokens ?? 0,
+              total_tokens: usage.total_tokens ?? 0,
+            }
+          } : {}),
         }
       };
 
@@ -128,8 +130,8 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
     }
 
     const { content, usage } = await langchainService.invoke(messagesForAI, {
-      temperature,
-      max_tokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
     });
 
     // 常规响应
@@ -140,12 +142,14 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
         : '聊天响应成功',
       data: {
         response: content,
-        character: characterInfo,
-        usage: usage ? {
-          prompt_tokens: usage.prompt_tokens ?? 0,
-          completion_tokens: usage.completion_tokens ?? 0,
-          total_tokens: usage.total_tokens ?? 0,
-        } : undefined,
+        ...(characterInfo ? { character: characterInfo } : {}),
+        ...(usage ? { 
+          usage: {
+            prompt_tokens: usage.prompt_tokens ?? 0,
+            completion_tokens: usage.completion_tokens ?? 0,
+            total_tokens: usage.total_tokens ?? 0,
+          }
+        } : {}),
       }
     };
 
@@ -183,6 +187,16 @@ export const getCharacters = async (req: Request, res: Response, next: NextFunct
 export const getCharacter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { characterId } = req.params;
+    
+    if (!characterId) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡ID不能为空'
+      };
+      res.status(400).json(response);
+      return;
+    }
+    
     const character = await characterService.getCharacter(characterId);
 
     if (!character) {
@@ -244,6 +258,15 @@ export const updateCharacter = async (req: Request, res: Response, next: NextFun
     const { characterId } = req.params;
     const updates: UpdateCharacterRequest = req.body;
 
+    if (!characterId) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡ID不能为空'
+      };
+      res.status(400).json(response);
+      return;
+    }
+
     const character = await characterService.updateCharacter(characterId, updates);
 
     if (!character) {
@@ -273,6 +296,16 @@ export const updateCharacter = async (req: Request, res: Response, next: NextFun
 export const deleteCharacter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { characterId } = req.params;
+    
+    if (!characterId) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡ID不能为空'
+      };
+      res.status(400).json(response);
+      return;
+    }
+    
     const deleted = await characterService.deleteCharacter(characterId);
 
     if (!deleted) {

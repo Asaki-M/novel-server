@@ -23,12 +23,12 @@
   "license": "ISC",
   "description": "简单的聊天服务器，支持角色卡功能",
   "dependencies": {
-    "@langchain/core": "^0.3.71",
-    "@langchain/openai": "^0.6.7",
+    "@langchain/core": "^0.3.72",
+    "@langchain/openai": "^0.5.18",
     "@supabase/supabase-js": "^2.55.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "langchain": "^0.3.30"
+    "langchain": "^0.3.31"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
