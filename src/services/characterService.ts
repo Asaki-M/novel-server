@@ -20,6 +20,8 @@ class CharacterService {
       avatar: request.avatar ?? null,
       description: request.description,
       system_prompt: request.systemPrompt,
+      backstory_prompt: request.backstoryPrompt ?? null,
+      backstory: request.backstory ?? null,
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
     };
@@ -44,6 +46,8 @@ class CharacterService {
     if (updates.avatar !== undefined) toUpdate.avatar = updates.avatar;
     if (updates.description !== undefined) toUpdate.description = updates.description;
     if (updates.systemPrompt !== undefined) toUpdate.system_prompt = updates.systemPrompt;
+    if (updates.backstoryPrompt !== undefined) toUpdate.backstory_prompt = updates.backstoryPrompt;
+    if (updates.backstory !== undefined) toUpdate.backstory = updates.backstory;
 
     const { data, error } = await supabase
       .from('characters')
@@ -71,6 +75,8 @@ class CharacterService {
     avatar: row.avatar || undefined,
     description: row.description,
     systemPrompt: row.system_prompt,
+    backstoryPrompt: row.backstory_prompt || undefined,
+    backstory: row.backstory || undefined,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   });

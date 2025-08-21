@@ -8,6 +8,9 @@ export interface ChatRequest {
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  characterId?: string;
+  sessionId?: string;
+  useMemory?: boolean;
 }
 
 export interface ChatResponse {

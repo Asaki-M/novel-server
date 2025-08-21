@@ -30,6 +30,12 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
       return;
     }
 
+    // 记忆模式需要 sessionId
+    if (useMemory && (!sessionId || typeof sessionId !== 'string' || sessionId.trim().length === 0)) {
+      res.status(400).json({ success: false, error: '记忆模式需要提供有效的 sessionId' });
+      return;
+    }
+
     let messagesForAI = messages;
     let systemPrompt: string | undefined = undefined;
     let characterInfo: { id: string; name: string; avatar?: string; category: string; } | undefined = undefined;

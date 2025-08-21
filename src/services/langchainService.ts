@@ -139,6 +139,7 @@ class LangChainService {
 	async invokeWithMemory(messages: ChatMessage[], options: LangChainCallOptions) {
 		const { temperature, max_tokens } = options;
 		const { sessionId, combined } = await this.buildMessagesWithMemory(messages, options);
+		// console.log('[MEMORY] invoke combined', { sessionId, count: combined.length, combined });
 		const result = await this.invoke(combined, { ...(typeof temperature === 'number' ? { temperature } : {}), ...(typeof max_tokens === 'number' ? { max_tokens } : {}) });
 
 		// 落库：追加本轮 user/assistant
@@ -155,6 +156,7 @@ class LangChainService {
 	async *streamWithMemory(messages: ChatMessage[], options: LangChainCallOptions) {
 		const { temperature, max_tokens } = options;
 		const { sessionId, combined } = await this.buildMessagesWithMemory(messages, options);
+		// console.log('[MEMORY] stream combined', { sessionId, count: combined.length, combined });
 		const model = this.createModel({ temperature, max_tokens });
 		const lcMessages = toLangChainMessages(combined);
 		const stream = await model.stream(lcMessages);

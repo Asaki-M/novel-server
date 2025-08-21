@@ -4,6 +4,8 @@ export interface Character {
   avatar?: string;
   description: string;
   systemPrompt: string;
+  backstoryPrompt?: string;
+  backstory?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -13,6 +15,8 @@ export interface CreateCharacterRequest {
   avatar?: string;
   description: string;
   systemPrompt: string;
+  backstoryPrompt?: string;
+  backstory?: string;
 }
 
 export interface UpdateCharacterRequest {
@@ -20,4 +24,6 @@ export interface UpdateCharacterRequest {
   avatar?: string;
   description?: string;
   systemPrompt?: string;
+  backstoryPrompt?: string;
+  backstory?: string;
 } 
