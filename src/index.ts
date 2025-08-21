@@ -1,8 +1,8 @@
 import express, { Express } from 'express';
 import config, { validateConfig } from './config/index.js';
 import routes from './routes/index.js';
-import { corsMiddleware } from './middlewares/cors.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import cors from 'cors';
 
 // 创建 Express 应用
 const app: Express = express();
@@ -20,7 +20,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // CORS 中间件
-app.use(corsMiddleware);
+app.use(cors());
+// 处理预检请求（OPTIONS）
+app.options('*', cors());
 
 // 路由
 app.use('/', routes);

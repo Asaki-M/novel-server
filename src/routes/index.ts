@@ -5,5 +5,8 @@ const router: ExpressRouter = Router();
 
 // 仅保留 API 路由
 router.use('/api', chatRoutes);
+router.use('/api/test', (req, res) => {
+  res.send('test');
+})
 
 export default router; 

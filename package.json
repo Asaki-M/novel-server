@@ -1,17 +1,15 @@
 {
   "name": "novel-chat-server",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "start": "node build/index.js",
-    "dev": "tsc && node build/index.js",
-    "test": "node scripts/test-api.js",
-    "clean": "rm -rf build/"
+    "build": "rimraf dist/ && tsc",
+    "start": "node dist/index.js",
+    "dev": "rimraf dist/ && tsc && node dist/index.js"
   },
   "files": [
-    "build"
+    "dist"
   ],
   "keywords": [
     "chat",
@@ -26,13 +24,16 @@
     "@langchain/core": "^0.3.72",
     "@langchain/openai": "^0.5.18",
     "@supabase/supabase-js": "^2.55.0",
+    "cors": "^2.8.5",
     "dotenv": "^16.5.0",
-    "express": "^5.1.0",
+    "express": "^4.21.2",
     "langchain": "^0.3.31"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^22.14.1",
+    "rimraf": "^6.0.1",
     "typescript": "^5.8.3"
   }
 }
