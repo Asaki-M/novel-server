@@ -3,6 +3,7 @@ import { SystemMessage, HumanMessage, AIMessage, BaseMessage } from "@langchain/
 import config from "../config/index.js";
 import { ChatMessage } from "../types/chat.js";
 import supabase from "../config/supabase.js";
+import { selectTools } from "../tools/index.js";
 
 export interface LangChainCallOptions {
 	temperature?: number | undefined;
@@ -11,6 +12,9 @@ export interface LangChainCallOptions {
 	sessionId?: string | undefined;
 	summaryWindow?: number | undefined;
 	summaryMaxTokens?: number | undefined;
+	// 工具相关
+	useTools?: boolean | undefined;
+	allowedTools?: string[] | undefined;
 }
 
 function toLangChainMessages(messages: ChatMessage[], systemPrompt?: string): BaseMessage[] {
@@ -102,12 +106,19 @@ class LangChainService {
 	private async summarizeContext(messages: ChatMessage[], systemPrompt?: string, maxTokens: number = 400): Promise<string> {
 		const text = messages.map((m) => `${m.role}: ${m.content}`).join("\n");
 		const prompt = `请用尽量精炼的中文总结以下多轮对话的关键信息（人物、意图、事实、待办、上下文前提），限制在约200字内：\n\n${text}`;
-		const { content } = await this.invoke([{ role: "user", content: prompt }], {
-			...(systemPrompt ? { systemPrompt } : {}),
-			max_tokens: maxTokens,
-			temperature: 0.2,
-		});
-		return content.trim();
+		try {
+			const { content } = await this.invoke([{ role: "user", content: prompt }], {
+				...(systemPrompt ? { systemPrompt } : {}),
+				max_tokens: maxTokens,
+				temperature: 0.2,
+			});
+			return content.trim();
+		} catch (err: any) {
+			console.warn('摘要失败，使用回退策略');
+			const recent = messages.slice(-6);
+			const fallback = recent.map((m) => `${m.role}: ${m.content}`.slice(0, 120)).join(" | ");
+			return `摘要不可用，使用最近上下文：${fallback}`;
+		}
 	}
 
 	private async buildMessagesWithMemory(input: ChatMessage[], opts: LangChainCallOptions): Promise<{ sessionId?: string; combined: ChatMessage[] }> {
@@ -139,7 +150,6 @@ class LangChainService {
 	async invokeWithMemory(messages: ChatMessage[], options: LangChainCallOptions) {
 		const { temperature, max_tokens } = options;
 		const { sessionId, combined } = await this.buildMessagesWithMemory(messages, options);
-		// console.log('[MEMORY] invoke combined', { sessionId, count: combined.length, combined });
 		const result = await this.invoke(combined, { ...(typeof temperature === 'number' ? { temperature } : {}), ...(typeof max_tokens === 'number' ? { max_tokens } : {}) });
 
 		// 落库：追加本轮 user/assistant
@@ -156,7 +166,6 @@ class LangChainService {
 	async *streamWithMemory(messages: ChatMessage[], options: LangChainCallOptions) {
 		const { temperature, max_tokens } = options;
 		const { sessionId, combined } = await this.buildMessagesWithMemory(messages, options);
-		// console.log('[MEMORY] stream combined', { sessionId, count: combined.length, combined });
 		const model = this.createModel({ temperature, max_tokens });
 		const lcMessages = toLangChainMessages(combined);
 		const stream = await model.stream(lcMessages);
@@ -176,6 +185,96 @@ class LangChainService {
 			if (full) toAppend.push({ role: "assistant", content: full });
 			if (toAppend.length) await this.appendMessages(sessionId, toAppend);
 		}
+	}
+
+	// ========= 一回合工具调用（非流式）=========
+	async invokeWithTools(messages: ChatMessage[], options: LangChainCallOptions) {
+		const { temperature, max_tokens, systemPrompt, allowedTools } = options;
+		const model = this.createModel({ temperature, max_tokens });
+
+		// 手动协议：模型以 JSON 返回工具调用意图
+		const tools = selectTools(allowedTools);
+		const toolInstruction = `如果你需要调用工具，请严格输出如下JSON：\n{"tool_name":"<tool_name>","arguments":{...}}。\n可用工具：\n${tools
+			.map((t) => `- ${t.name}: ${t.description}, schema: ${t.schema.toString()}`)
+			.join("\n")}\n如果不需要工具，直接输出答案文本。`;
+
+		const lcMessages = toLangChainMessages(
+			[{ role: "system", content: toolInstruction }, ...messages],
+			systemPrompt
+		);
+		const res = await model.invoke(lcMessages);
+		const raw = resolveContent(res.content);
+
+		// 尝试解析工具调用
+		let parsed: any = null;
+		try {
+			parsed = JSON.parse(raw);
+		} catch {}
+
+		if (!parsed || typeof parsed !== "object" || !parsed.tool_name) {
+			// 非工具输出，直接返回文本
+			return { content: raw } as { content: string };
+		}
+
+		const tool = tools.find((t) => t.name === parsed.tool_name);
+		if (!tool) {
+			return { content: `工具 ${parsed.tool_name} 不可用或未被允许。原始输出：` + raw };
+		}
+
+		// 参数兜底：为插画工具缺失的 prompt 回填最后一条用户消息
+		if (tool.name === 'generate_illustration') {
+			const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+			if (lastUser && (!parsed.arguments || typeof parsed.arguments.prompt !== 'string' || parsed.arguments.prompt.trim().length === 0)) {
+				parsed.arguments = { ...(parsed.arguments || {}), prompt: lastUser.content };
+			}
+		}
+
+		// 参数校验
+		let args: any;
+		try {
+			args = tool.schema.parse(parsed.arguments ?? {});
+		} catch (e: any) {
+			return { content: `工具参数不合法：${e?.message || e}` };
+		}
+
+		// 执行工具
+		const result = await tool.call(args as any);
+		// 若工具返回 base64，则补上 data URL 前缀；若返回 data url，则完整透传
+		if (result && typeof result === 'object') {
+			if (typeof (result as any).base64 === 'string' && (result as any).base64.length > 0) {
+				return { content: `data:image/png;base64,${(result as any).base64}` } as { content: string };
+			}
+			if (typeof (result as any).url === 'string' && (result as any).url.startsWith('data:')) {
+				return { content: (result as any).url } as { content: string };
+			}
+		}
+		return { content: JSON.stringify({ tool_result: result }) } as { content: string };
+	}
+
+	// ========= 带记忆 + 工具（单回合）=========
+	async invokeWithMemoryAndTools(messages: ChatMessage[], options: LangChainCallOptions) {
+		const { sessionId } = options;
+		// 工具调用仅依据用户最后一条消息决定参数，不使用总结内容
+		const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+		const inputForTool = lastUser ? [lastUser] : messages.slice(-1);
+		const result = await this.invokeWithTools(inputForTool, options);
+
+		// 落库：避免把大体积 base64/dataURL 写入历史，改为占位内容
+		if (sessionId) {
+			const toAppend: ChatMessage[] = [];
+			if (lastUser) toAppend.push(lastUser);
+			if (result.content) {
+				const isDataUrl = typeof result.content === 'string' && result.content.startsWith('data:image/');
+				const head = typeof result.content === 'string' ? result.content.slice(0, 200) : '';
+				const isBase64Only = typeof result.content === 'string' && result.content.length > 1000 && /^[A-Za-z0-9+/=]+$/.test(head.replace(/\s+/g, ''));
+				const isLargeImagePayload = isDataUrl || isBase64Only;
+				const assistantContent = isLargeImagePayload ? `[image_generated length=${result.content.length}]` : result.content;
+				toAppend.push({ role: "assistant", content: assistantContent });
+			}
+			if (toAppend.length) await this.appendMessages(sessionId, toAppend);
+		}
+
+		return result;
 	}
 }
 

@@ -11,6 +11,9 @@ export interface ChatRequest {
   characterId?: string;
   sessionId?: string;
   useMemory?: boolean;
+  // 工具调用（function calling）相关，可选启用
+  useTools?: boolean;                 // 是否启用工具调用（仅非流式）
+  allowedTools?: string[];            // 允许使用的工具白名单（默认全部）
 }
 
 export interface ChatResponse {

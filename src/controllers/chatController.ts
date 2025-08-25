@@ -13,11 +13,15 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
       stream,
       characterId,      // 可选：角色卡ID
       sessionId,        // 可选：会话ID（启用记忆时使用）
-      useMemory         // 可选：是否启用记忆
+      useMemory,        // 可选：是否启用记忆
+      useTools,         // 可选：是否启用工具调用
+      allowedTools      // 可选：工具白名单
     }: ChatRequest & { 
       characterId?: string;
       sessionId?: string;
       useMemory?: boolean;
+      useTools?: boolean;
+      allowedTools?: string[];
     } = req.body;
 
     // 验证基本参数
@@ -36,6 +40,9 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
       return;
     }
 
+    // 默认启用工具：未显式传 useTools 时视为 true
+    const toolsEnabled = typeof useTools === 'boolean' ? useTools : true;
+
     let messagesForAI = messages;
     let systemPrompt: string | undefined = undefined;
     let characterInfo: { id: string; name: string; avatar?: string; category: string; } | undefined = undefined;
@@ -45,8 +52,8 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
       const character = await characterService.getCharacter(characterId);
       if (character) {
         systemPrompt = character.systemPrompt;
-        // 非记忆模式下，仍然把system注入到消息开头
-        if (!useMemory) {
+        // 非记忆 & 非工具 模式下，才把system注入到消息开头，避免重复
+        if (!useMemory && !toolsEnabled) {
           const systemMessage = { role: 'system' as const, content: character.systemPrompt };
           messagesForAI = [systemMessage, ...messages];
         }
@@ -62,6 +69,12 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
       } else {
         console.warn('角色卡不存在:', characterId);
       }
+    }
+
+    // 工具模式暂不支持流式
+    if (stream && toolsEnabled) {
+      res.status(400).json({ success: false, error: '暂不支持在流式模式下使用工具调用' });
+      return;
     }
 
     // 调用AI
@@ -103,6 +116,34 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
     }
 
     // 非流式
+    // 工具调用路径（单回合）
+    if (toolsEnabled) {
+      const baseOptions = {
+        ...(typeof temperature === 'number' ? { temperature } : {}),
+        ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
+        ...(systemPrompt ? { systemPrompt } : {}),
+        ...(Array.isArray(allowedTools) ? { allowedTools } : {}),
+      } as any;
+
+      const result = useMemory
+        ? await langchainService.invokeWithMemoryAndTools(messages, { ...baseOptions, ...(sessionId ? { sessionId } : {}), summaryWindow: 12, summaryMaxTokens: 400 })
+        : await langchainService.invokeWithTools(messages, baseOptions);
+
+      const response: ChatResponse = {
+        success: true,
+        message: characterInfo 
+          ? `${characterInfo.name} 回复成功`
+          : '聊天响应成功(工具)',
+        data: {
+          response: result.content,
+          ...(characterInfo ? { character: characterInfo } : {}),
+        }
+      };
+
+      res.json(response);
+      return;
+    }
+
     if (useMemory) {
       const { content, usage } = await langchainService.invokeWithMemory(messages, {
         ...(typeof temperature === 'number' ? { temperature } : {}),
