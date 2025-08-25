@@ -10,6 +10,7 @@
 
 - 使用 OpenRouter 进行对话，需要环境变量：`OPENROUTER_API_KEY`
 - 使用 Supabase 存储带记忆聊天与角色卡，需要环境变量：`SUPABASE_URL`、`SUPABASE_ANON_KEY`
+- 使用 Hugging Face 生成插画，需要环境变量：`HF_TOKEN`
 
 ---
 
@@ -32,7 +33,7 @@
 ## 聊天接口
 
 ### POST `/api/chat`
-向大模型发起聊天。
+向大模型发起聊天/工具调用。
 
 - 请求头：`Content-Type: application/json`
 - 请求体：
@@ -44,31 +45,44 @@
   "characterId": "optional-character-id",
   "temperature": 0.7,
   "max_tokens": 1024,
-  "stream": false
+  "stream": false,
+  "useTools": true,
+  "allowedTools": ["generate_illustration"],
+  "useMemory": true,
+  "sessionId": "sess-123"
 }
 ```
 - 字段说明：
-  - `messages`: 对话消息数组，元素为 `{ role: 'user'|'assistant'|'system', content: string }`
-  - `characterId`: 选填，角色卡 ID；提供后会注入其 `systemPrompt`
-  - `temperature`: 选填，默认 0.7
-  - `max_tokens`: 选填
-  - `stream`: 选填，是否使用 SSE 流式
+  - `messages` 必填：对话消息数组，元素为 `{ role: 'user'|'assistant'|'system', content: string }`
+  - `characterId` 选填：角色卡 ID；提供后会注入其 `systemPrompt`
+  - `temperature` 选填：默认 0.7
+  - `max_tokens` 选填
+  - `stream` 选填：是否使用 SSE 流式；当 `useTools: true` 时禁止流式
+  - `useTools` 选填：是否启用工具调用，默认启用（未传视为 `true`）
+  - `allowedTools` 选填：工具白名单；不传表示允许内置全部工具
+  - `useMemory` 选填：是否启用会话记忆
+  - `sessionId` 选填：记忆模式下的会话 ID（必填）
+
+- 行为说明：
+  - 工具模式不支持流式（若 `stream: true` 且 `useTools: true` 会返回 400）
+  - 工具参数若未提供 `prompt`，将自动回填为“最后一条用户消息”
+  - 插画生成返回为带前缀的 data URL（`data:image/png;base64,...`）
+  - 记忆存储时，图片结果以占位文本写入，避免后续摘要出错
 
 - 响应（非流式）示例：
 ```json
 {
   "success": true,
-  "message": "聊天响应成功",
+  "message": "聊天响应成功(工具)",
   "data": {
-    "response": "你好！有什么可以帮你？",
-    "character": { "id": "...", "name": "...", "category": "custom" },
-    "usage": { "prompt_tokens": 10, "completion_tokens": 25, "total_tokens": 35 }
+    "response": "data:image/png;base64,....",
+    "character": { "id": "...", "name": "...", "category": "custom" }
   }
 }
 ```
 
 #### 流式模式（SSE）
-当 `stream: true` 时，返回 `text/event-stream`：
+当 `stream: true` 且未启用工具时，返回 `text/event-stream`：
 ```
 data: {"content":"在"}
 
@@ -83,7 +97,7 @@ data: [DONE]
 ## 角色卡接口
 
 角色卡与数据库表 `characters` 对应，字段：
-- `id: string`（代码中使用 `uuid` 生成；若你手动写入也可用自定义字符串）
+- `id: string`
 - `name: string`
 - `avatar?: string | null`
 - `description: string`
@@ -131,7 +145,7 @@ data: [DONE]
 ```
 
 常见状态码：
-- 400 参数错误
+- 400 参数错误（例如：`useTools=true` 且 `stream=true`）
 - 401 认证失败（OpenRouter key 失效）
 - 404 路径不存在
 - 429 请求过多
@@ -141,32 +155,40 @@ data: [DONE]
 
 ## 示例
 
-### cURL
+### cURL（生成插画）
 ```bash
-curl -X POST http://localhost:3000/api/chat \
+curl -X POST http://localhost:3008/api/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "messages": [{"role": "user", "content": "你好！"}]
+    "messages": [{"role": "user", "content": "帮我按照之前的剧情生成一张插画"}],
+    "allowedTools": ["generate_illustration"],
+    "useMemory": true,
+    "sessionId": "sess-123"
   }'
 ```
 
-### JavaScript（非流式）
+### JavaScript（非流式 + 工具）
 ```javascript
-const res = await fetch('http://localhost:3000/api/chat', {
+const res = await fetch('http://localhost:3008/api/chat', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ messages: [{ role: 'user', content: '讲个故事' }] })
+  body: JSON.stringify({
+    messages: [{ role: 'user', content: '帮我按照之前的剧情生成一张插画' }],
+    allowedTools: ['generate_illustration'],
+    useMemory: true,
+    sessionId: 'sess-123'
+  })
 });
 const data = await res.json();
-console.log(data.data.response);
+const imgSrc = data.data.response; // data:image/png;base64,...
 ```
 
-### JavaScript（流式）
+### JavaScript（流式，无工具）
 ```javascript
-const res = await fetch('http://localhost:3000/api/chat', {
+const res = await fetch('http://localhost:3008/api/chat', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ messages: [{ role: 'user', content: '讲个故事' }], stream: true })
+  body: JSON.stringify({ messages: [{ role: 'user', content: '讲个故事' }], stream: true, useTools: false })
 });
 const reader = res.body.getReader();
 while (true) {
