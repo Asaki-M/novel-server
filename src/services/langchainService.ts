@@ -227,6 +227,10 @@ class LangChainService {
 			if (lastUser && (!parsed.arguments || typeof parsed.arguments.prompt !== 'string' || parsed.arguments.prompt.trim().length === 0)) {
 				parsed.arguments = { ...(parsed.arguments || {}), prompt: lastUser.content };
 			}
+			// 添加sessionId参数用于图片存储
+			if (options.sessionId) {
+				parsed.arguments = { ...(parsed.arguments || {}), sessionId: options.sessionId };
+			}
 		}
 
 		// 参数校验
@@ -239,13 +243,17 @@ class LangChainService {
 
 		// 执行工具
 		const result = await tool.call(args as any);
-		// 若工具返回 base64，则补上 data URL 前缀；若返回 data url，则完整透传
+		// 若工具返回 base64，则补上 data URL 前缀；若返回 data url 或 http(s) url，则完整透传
 		if (result && typeof result === 'object') {
 			if (typeof (result as any).base64 === 'string' && (result as any).base64.length > 0) {
 				return { content: `data:image/png;base64,${(result as any).base64}` } as { content: string };
 			}
-			if (typeof (result as any).url === 'string' && (result as any).url.startsWith('data:')) {
-				return { content: (result as any).url } as { content: string };
+			if (typeof (result as any).url === 'string') {
+				const url = (result as any).url;
+				// 支持data URL、http和https URL
+				if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+					return { content: url } as { content: string };
+				}
 			}
 		}
 		return { content: JSON.stringify({ tool_result: result }) } as { content: string };
@@ -259,17 +267,24 @@ class LangChainService {
 		const inputForTool = lastUser ? [lastUser] : messages.slice(-1);
 		const result = await this.invokeWithTools(inputForTool, options);
 
-		// 落库：避免把大体积 base64/dataURL 写入历史，改为占位内容
+		// 落库：现在图片返回的是Storage URL而不是大体积base64，可以直接存储
 		if (sessionId) {
 			const toAppend: ChatMessage[] = [];
 			if (lastUser) toAppend.push(lastUser);
 			if (result.content) {
-				const isDataUrl = typeof result.content === 'string' && result.content.startsWith('data:image/');
-				const head = typeof result.content === 'string' ? result.content.slice(0, 200) : '';
-				const isBase64Only = typeof result.content === 'string' && result.content.length > 1000 && /^[A-Za-z0-9+/=]+$/.test(head.replace(/\s+/g, ''));
-				const isLargeImagePayload = isDataUrl || isBase64Only;
-				const assistantContent = isLargeImagePayload ? `[image_generated length=${result.content.length}]` : result.content;
-				toAppend.push({ role: "assistant", content: assistantContent });
+				// 检查是否为大体积的base64 data URL（作为回退情况）
+				const isLargeBase64DataUrl = typeof result.content === 'string' && 
+					result.content.startsWith('data:image/') && 
+					result.content.length > 10000; // 大于10KB的base64视为大文件
+				
+				if (isLargeBase64DataUrl) {
+					// 只对大体秏base64使用占位符
+					const assistantContent = `[image_generated length=${result.content.length}]`;
+					toAppend.push({ role: "assistant", content: assistantContent });
+				} else {
+					// Storage URL或小图片直接存储
+					toAppend.push({ role: "assistant", content: result.content });
+				}
 			}
 			if (toAppend.length) await this.appendMessages(sessionId, toAppend);
 		}

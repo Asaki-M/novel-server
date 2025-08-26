@@ -21,6 +21,7 @@
   "license": "ISC",
   "description": "简单的聊天服务器，支持角色卡功能",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.873.0",
     "@huggingface/inference": "^4.7.1",
     "@langchain/core": "^0.3.72",
     "@langchain/openai": "^0.5.18",
@@ -29,12 +30,14 @@
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "langchain": "^0.3.31",
+    "uuid": "^11.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^22.14.1",
+    "@types/uuid": "^10.0.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.8.3"
   }

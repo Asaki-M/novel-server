@@ -1,8 +1,10 @@
 import express, { Express } from 'express';
+import cors from 'cors';
+
 import config, { validateConfig } from './config/index.js';
 import routes from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
-import cors from 'cors';
+import imageStorageService from './services/imageStorageService.js';
 
 // 创建 Express 应用
 const app: Express = express();
@@ -14,6 +16,20 @@ try {
   console.error('❌ 配置验证失败:', (error as Error).message);
   process.exit(1);
 }
+
+// 异步初始化Supabase Storage
+async function initializeStorage() {
+  try {
+    await imageStorageService.ensureBucketExists();
+    console.log('🗂️ Supabase Storage初始化成功');
+  } catch (error: any) {
+    console.warn('⚠️ Supabase Storage初始化失败:', error.message);
+    console.warn('图片存储功能可能不可用，将回退到base64模式');
+  }
+}
+
+// 启动存储初始化（非阻塞）
+initializeStorage();
 
 // 基础中间件
 app.use(express.json());

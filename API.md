@@ -11,22 +11,7 @@
 - 使用 OpenRouter 进行对话，需要环境变量：`OPENROUTER_API_KEY`
 - 使用 Supabase 存储带记忆聊天与角色卡，需要环境变量：`SUPABASE_URL`、`SUPABASE_ANON_KEY`
 - 使用 Hugging Face 生成插画，需要环境变量：`HF_TOKEN`
-
----
-
-## 健康检查
-
-### GET `/api/health/db`
-检查 Supabase 数据库连通性。
-
-- 响应示例（成功）：
-```json
-{ "ok": true, "latencyMs": 45, "sampleCount": 0 }
-```
-- 响应示例（失败）：
-```json
-{ "ok": false, "latencyMs": 12, "error": "..." }
-```
+- 使用 Supabase Storage 存储生成的图片，使用 `text_to_image` 桶
 
 ---
 
@@ -66,8 +51,9 @@
 - 行为说明：
   - 工具模式不支持流式（若 `stream: true` 且 `useTools: true` 会返回 400）
   - 工具参数若未提供 `prompt`，将自动回填为“最后一条用户消息”
-  - 插画生成返回为带前缀的 data URL（`data:image/png;base64,...`）
-  - 记忆存储时，图片结果以占位文本写入，避免后续摘要出错
+  - 插画生成限制图片尺寸为 512x512 像素，并上传到 Supabase Storage
+  - 返回的图片为 Supabase Storage 公开 URL，支持直接访问
+  - 记忆存储时，图片 URL 直接存储（不再使用占位文本）
 
 - 响应（非流式）示例：
 ```json
@@ -75,7 +61,7 @@
   "success": true,
   "message": "聊天响应成功(工具)",
   "data": {
-    "response": "data:image/png;base64,....",
+    "response": "https://your-supabase-project.supabase.co/storage/v1/object/public/text_to_image/sessions/sess-123/1234567890-uuid.png",
     "character": { "id": "...", "name": "...", "category": "custom" }
   }
 }
@@ -134,6 +120,34 @@ data: [DONE]
 
 ### DELETE `/api/characters/:characterId`
 删除角色卡。
+
+---
+
+## 记忆接口
+
+### GET `/api/memory/:sessionId`
+按 `sessionId` 返回该会话的聊天记录，时间升序。
+
+- 响应示例：
+```json
+{
+  "success": true,
+  "data": [
+    { "role": "user", "content": "你好", "created_at": "2025-01-01T12:00:00Z" },
+    { "role": "assistant", "content": "你好！", "created_at": "2025-01-01T12:00:02Z" }
+  ]
+}
+```
+
+说明：图片生成结果存储在 Supabase Storage 中，返回公开访问 URL。清空会话记忆时会同时删除相关图片文件。
+
+### DELETE `/api/memory/:sessionId`
+清空该 `sessionId` 的聊天记录并删除相关图片文件。
+
+- 响应示例：
+```json
+{ "success": true, "message": "已清空会话记忆", "data": { "deleted": 6 } }
+```
 
 ---
 

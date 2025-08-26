@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import supabase from '../config/supabase.js';
+import imageStorageService from '../services/imageStorageService.js';
 
 export const getSessionHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -37,6 +38,15 @@ export const clearSessionHistory = async (req: Request, res: Response, next: Nex
       .eq('session_id', sessionId);
 
     if (error) throw error;
+
+    // 同时清理该会话的所有图片
+    try {
+      await imageStorageService.cleanSessionImages(sessionId);
+      console.log(`已清理会话 ${sessionId} 的图片资源`);
+    } catch (imageError: any) {
+      console.warn(`清理会话 ${sessionId} 的图片失败:`, imageError.message);
+      // 不影响主体功能，只记录警告
+    }
 
     res.json({ success: true, message: '已清空会话记忆', data: { deleted: count ?? 0 } });
   } catch (err) {
