@@ -1,7 +1,7 @@
 import { Router, Router as ExpressRouter } from 'express';
-import { 
-  chat, 
-
+import {
+  chat,
+  chatStream,
   getCharacters,
   getCharacter,
   createCharacter,
@@ -12,7 +12,8 @@ import {
 const router: ExpressRouter = Router();
 
 // 聊天接口
-router.post('/chat', chat);
+router.post('/chat', chat);           // 正常响应
+router.post('/chat/stream', chatStream); // 流式响应
 
 // 角色卡管理
 router.get('/characters', getCharacters);           // 获取角色卡列表

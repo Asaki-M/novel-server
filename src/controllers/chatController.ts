@@ -4,204 +4,133 @@ import characterService from '../services/characterService.js';
 import { ChatRequest, ChatResponse, ApiResponse } from '../types/chat.js';
 import { CreateCharacterRequest, UpdateCharacterRequest } from '../types/character.js';
 
+// 通用的参数验证和角色卡处理函数
+const validateAndProcessRequest = async (req: Request) => {
+  const {
+    messages,
+    temperature,
+    max_tokens,
+    characterId,      // 必填：角色卡ID
+    sessionId         // 必填：会话ID
+  } = req.body as ChatRequest & {
+    characterId: string;
+    sessionId: string;
+  };
+
+  // 验证基本参数
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    throw new Error('请提供有效的消息数组');
+  }
+
+  // sessionId 和 characterId 是必填的
+  if (!sessionId || typeof sessionId !== 'string' || sessionId.trim().length === 0) {
+    throw new Error('sessionId 是必需的');
+  }
+
+  if (!characterId || typeof characterId !== 'string' || characterId.trim().length === 0) {
+    throw new Error('characterId 是必需的');
+  }
+
+  // 功能默认启用，无需额外配置
+
+
+  let systemPrompt: string | undefined = undefined;
+
+
+  // 处理角色卡
+  if (characterId) {
+    const character = await characterService.getCharacter(characterId);
+    if (character) {
+      systemPrompt = character.systemPrompt;
+      console.log('🎭 使用角色卡:', character.name);
+    } else {
+      console.warn('角色卡不存在:', characterId);
+    }
+  }
+
+  return {
+    messages,
+    temperature,
+    max_tokens,
+    sessionId,
+    systemPrompt
+  };
+};
+
+// 正常响应接口 - /chat
 export const chat = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { 
-      messages, 
-      temperature, 
-      max_tokens, 
-      stream,
-      characterId,      // 可选：角色卡ID
-      sessionId,        // 可选：会话ID（启用记忆时使用）
-      useMemory,        // 可选：是否启用记忆
-      useTools,         // 可选：是否启用工具调用
-      allowedTools      // 可选：工具白名单
-    }: ChatRequest & { 
-      characterId?: string;
-      sessionId?: string;
-      useMemory?: boolean;
-      useTools?: boolean;
-      allowedTools?: string[];
-    } = req.body;
+    const {
+      messages,
+      temperature,
+      max_tokens,
+      sessionId,
+      systemPrompt
+    } = await validateAndProcessRequest(req);
 
-    // 验证基本参数
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      const response: ChatResponse = {
-        success: false,
-        error: '请提供有效的消息数组'
-      };
-      res.status(400).json(response);
-      return;
-    }
+    // 使用 LangChain 服务，启用记忆功能
+    const result = await langchainService.invoke(messages, {
+      temperature,
+      max_tokens,
+      systemPrompt,
+      sessionId
+    });
 
-    // 记忆模式需要 sessionId
-    if (useMemory && (!sessionId || typeof sessionId !== 'string' || sessionId.trim().length === 0)) {
-      res.status(400).json({ success: false, error: '记忆模式需要提供有效的 sessionId' });
-      return;
-    }
+    const response: ChatResponse = {
+      success: true,
+      message: result.content
+    };
 
-    // 默认启用工具：未显式传 useTools 时视为 true
-    const toolsEnabled = typeof useTools === 'boolean' ? useTools : true;
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+};
 
-    let messagesForAI = messages;
-    let systemPrompt: string | undefined = undefined;
-    let characterInfo: { id: string; name: string; avatar?: string; category: string; } | undefined = undefined;
+// 流式响应接口 - /chat/stream
+export const chatStream = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { messages } = req.body as ChatRequest & { sessionId: string; characterId: string };
 
-    // 处理角色卡
-    if (characterId) {
-      const character = await characterService.getCharacter(characterId);
-      if (character) {
-        systemPrompt = character.systemPrompt;
-        // 非记忆 & 非工具 模式下，才把system注入到消息开头，避免重复
-        if (!useMemory && !toolsEnabled) {
-          const systemMessage = { role: 'system' as const, content: character.systemPrompt };
-          messagesForAI = [systemMessage, ...messages];
-        }
-        
-        characterInfo = {
-          id: character.id,
-          name: character.name,
-          category: 'custom',
-          ...(character.avatar ? { avatar: character.avatar } : {}),
-        };
+    const {
+      temperature,
+      max_tokens,
+      sessionId,
+      systemPrompt
+    } = await validateAndProcessRequest(req);
 
-        console.log('🎭 使用角色卡:', character.name);
-      } else {
-        console.warn('角色卡不存在:', characterId);
+    // 设置流式响应头
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // 使用 LangChain 流式响应（默认启用记忆）
+    for await (const delta of langchainService.streamWithMemory(messages, {
+      temperature,
+      max_tokens,
+      systemPrompt,
+      sessionId,
+      summaryWindow: 12,
+      summaryMaxTokens: 400,
+    })) {
+      if (delta) {
+        res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
       }
     }
 
-    // 工具模式暂不支持流式
-    if (stream && toolsEnabled) {
-      res.status(400).json({ success: false, error: '暂不支持在流式模式下使用工具调用' });
-      return;
-    }
-
-    // 调用AI
-    if (stream) {
-      // 流式响应
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      });
-
-      if (useMemory) {
-        for await (const delta of langchainService.streamWithMemory(messages, {
-          ...(typeof temperature === 'number' ? { temperature } : {}),
-          ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
-          ...(systemPrompt ? { systemPrompt } : {}),
-          ...(sessionId ? { sessionId } : {}),
-          summaryWindow: 12,
-          summaryMaxTokens: 400,
-        })) {
-          if (delta) {
-            res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
-          }
-        }
-      } else {
-        for await (const delta of langchainService.stream(messagesForAI, {
-          ...(typeof temperature === 'number' ? { temperature } : {}),
-          ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
-        })) {
-          if (delta) {
-            res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
-          }
-        }
-      }
-
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    if (error instanceof Error) {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
       return;
     }
-
-    // 非流式
-    // 工具调用路径（单回合）
-    if (toolsEnabled) {
-      const baseOptions = {
-        ...(typeof temperature === 'number' ? { temperature } : {}),
-        ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
-        ...(systemPrompt ? { systemPrompt } : {}),
-        ...(Array.isArray(allowedTools) ? { allowedTools } : {}),
-      } as any;
-
-      const result = useMemory
-        ? await langchainService.invokeWithMemoryAndTools(messages, { ...baseOptions, ...(sessionId ? { sessionId } : {}), summaryWindow: 12, summaryMaxTokens: 400 })
-        : await langchainService.invokeWithTools(messages, baseOptions);
-
-      const response: ChatResponse = {
-        success: true,
-        message: characterInfo 
-          ? `${characterInfo.name} 回复成功`
-          : '聊天响应成功(工具)',
-        data: {
-          response: result.content,
-          ...(characterInfo ? { character: characterInfo } : {}),
-        }
-      };
-
-      res.json(response);
-      return;
-    }
-
-    if (useMemory) {
-      const { content, usage } = await langchainService.invokeWithMemory(messages, {
-        ...(typeof temperature === 'number' ? { temperature } : {}),
-        ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
-        ...(systemPrompt ? { systemPrompt } : {}),
-        ...(sessionId ? { sessionId } : {}),
-        summaryWindow: 12,
-        summaryMaxTokens: 400,
-      });
-
-      const result: ChatResponse = {
-        success: true,
-        message: characterInfo 
-          ? `${characterInfo.name} 回复成功`
-          : '记忆聊天响应成功',
-        data: {
-          response: content,
-          ...(characterInfo ? { character: characterInfo } : {}),
-          ...(usage ? { 
-            usage: {
-              prompt_tokens: usage.prompt_tokens ?? 0,
-              completion_tokens: usage.completion_tokens ?? 0,
-              total_tokens: usage.total_tokens ?? 0,
-            }
-          } : {}),
-        }
-      };
-
-      res.json(result);
-      return;
-    }
-
-    const { content, usage } = await langchainService.invoke(messagesForAI, {
-      ...(typeof temperature === 'number' ? { temperature } : {}),
-      ...(typeof max_tokens === 'number' ? { max_tokens } : {}),
-    });
-
-    // 常规响应
-    const result: ChatResponse = {
-      success: true,
-      message: characterInfo 
-        ? `${characterInfo.name} 回复成功`
-        : '聊天响应成功',
-      data: {
-        response: content,
-        ...(characterInfo ? { character: characterInfo } : {}),
-        ...(usage ? { 
-          usage: {
-            prompt_tokens: usage.prompt_tokens ?? 0,
-            completion_tokens: usage.completion_tokens ?? 0,
-            total_tokens: usage.total_tokens ?? 0,
-          }
-        } : {}),
-      }
-    };
-
-    res.json(result);
-  } catch (error) {
     next(error);
   }
 };
@@ -213,7 +142,7 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
 /**
  * 获取角色卡列表
  */
-export const getCharacters = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getCharacters = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const list = await characterService.listCharacters();
 

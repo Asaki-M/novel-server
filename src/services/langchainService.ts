@@ -3,7 +3,7 @@ import { SystemMessage, HumanMessage, AIMessage, BaseMessage } from "@langchain/
 import config from "../config/index.js";
 import { ChatMessage } from "../types/chat.js";
 import supabase from "../config/supabase.js";
-import { selectTools } from "../tools/index.js";
+// 工具功能已移至标准 MCP 服务器
 
 export interface LangChainCallOptions {
 	temperature?: number | undefined;
@@ -187,110 +187,7 @@ class LangChainService {
 		}
 	}
 
-	// ========= 一回合工具调用（非流式）=========
-	async invokeWithTools(messages: ChatMessage[], options: LangChainCallOptions) {
-		const { temperature, max_tokens, systemPrompt, allowedTools } = options;
-		const model = this.createModel({ temperature, max_tokens });
-
-		// 手动协议：模型以 JSON 返回工具调用意图
-		const tools = selectTools(allowedTools);
-		const toolInstruction = `如果你需要调用工具，请严格输出如下JSON：\n{"tool_name":"<tool_name>","arguments":{...}}。\n可用工具：\n${tools
-			.map((t) => `- ${t.name}: ${t.description}, schema: ${t.schema.toString()}`)
-			.join("\n")}\n如果不需要工具，直接输出答案文本。`;
-
-		const lcMessages = toLangChainMessages(
-			[{ role: "system", content: toolInstruction }, ...messages],
-			systemPrompt
-		);
-		const res = await model.invoke(lcMessages);
-		const raw = resolveContent(res.content);
-
-		// 尝试解析工具调用
-		let parsed: any = null;
-		try {
-			parsed = JSON.parse(raw);
-		} catch {}
-
-		if (!parsed || typeof parsed !== "object" || !parsed.tool_name) {
-			// 非工具输出，直接返回文本
-			return { content: raw } as { content: string };
-		}
-
-		const tool = tools.find((t) => t.name === parsed.tool_name);
-		if (!tool) {
-			return { content: `工具 ${parsed.tool_name} 不可用或未被允许。原始输出：` + raw };
-		}
-
-		// 参数兜底：为插画工具缺失的 prompt 回填最后一条用户消息
-		if (tool.name === 'generate_illustration') {
-			const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-			if (lastUser && (!parsed.arguments || typeof parsed.arguments.prompt !== 'string' || parsed.arguments.prompt.trim().length === 0)) {
-				parsed.arguments = { ...(parsed.arguments || {}), prompt: lastUser.content };
-			}
-			// 添加sessionId参数用于图片存储
-			if (options.sessionId) {
-				parsed.arguments = { ...(parsed.arguments || {}), sessionId: options.sessionId };
-			}
-		}
-
-		// 参数校验
-		let args: any;
-		try {
-			args = tool.schema.parse(parsed.arguments ?? {});
-		} catch (e: any) {
-			return { content: `工具参数不合法：${e?.message || e}` };
-		}
-
-		// 执行工具
-		const result = await tool.call(args as any);
-		// 若工具返回 base64，则补上 data URL 前缀；若返回 data url 或 http(s) url，则完整透传
-		if (result && typeof result === 'object') {
-			if (typeof (result as any).base64 === 'string' && (result as any).base64.length > 0) {
-				return { content: `data:image/png;base64,${(result as any).base64}` } as { content: string };
-			}
-			if (typeof (result as any).url === 'string') {
-				const url = (result as any).url;
-				// 支持data URL、http和https URL
-				if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
-					return { content: url } as { content: string };
-				}
-			}
-		}
-		return { content: JSON.stringify({ tool_result: result }) } as { content: string };
-	}
-
-	// ========= 带记忆 + 工具（单回合）=========
-	async invokeWithMemoryAndTools(messages: ChatMessage[], options: LangChainCallOptions) {
-		const { sessionId } = options;
-		// 工具调用仅依据用户最后一条消息决定参数，不使用总结内容
-		const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-		const inputForTool = lastUser ? [lastUser] : messages.slice(-1);
-		const result = await this.invokeWithTools(inputForTool, options);
-
-		// 落库：现在图片返回的是Storage URL而不是大体积base64，可以直接存储
-		if (sessionId) {
-			const toAppend: ChatMessage[] = [];
-			if (lastUser) toAppend.push(lastUser);
-			if (result.content) {
-				// 检查是否为大体积的base64 data URL（作为回退情况）
-				const isLargeBase64DataUrl = typeof result.content === 'string' && 
-					result.content.startsWith('data:image/') && 
-					result.content.length > 10000; // 大于10KB的base64视为大文件
-				
-				if (isLargeBase64DataUrl) {
-					// 只对大体秏base64使用占位符
-					const assistantContent = `[image_generated length=${result.content.length}]`;
-					toAppend.push({ role: "assistant", content: assistantContent });
-				} else {
-					// Storage URL或小图片直接存储
-					toAppend.push({ role: "assistant", content: result.content });
-				}
-			}
-			if (toAppend.length) await this.appendMessages(sessionId, toAppend);
-		}
-
-		return result;
-	}
+	// 工具调用功能已移至标准 MCP 服务器
 }
 
 export default new LangChainService(); 
