@@ -6,7 +6,9 @@
   "scripts": {
     "build": "rimraf dist/ && tsc",
     "start": "node dist/index.js",
-    "dev": "rimraf dist/ && tsc && node dist/index.js"
+    "dev": "rimraf dist/ && tsc && node dist/index.js",
+    "mcp": "node dist/mcp/server.js",
+    "mcp:dev": "tsx src/mcp/server.ts"
   },
   "files": [
     "dist"
@@ -23,8 +25,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
     "@huggingface/inference": "^4.7.1",
+    "@langchain/community": "^0.3.53",
     "@langchain/core": "^0.3.72",
     "@langchain/openai": "^0.5.18",
+    "@modelcontextprotocol/sdk": "^1.17.4",
     "@supabase/supabase-js": "^2.55.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -39,6 +43,7 @@
     "@types/node": "^22.14.1",
     "@types/uuid": "^10.0.0",
     "rimraf": "^6.0.1",
+    "tsx": "^4.20.5",
     "typescript": "^5.8.3"
   }
 }
