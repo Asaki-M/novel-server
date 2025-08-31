@@ -7,8 +7,8 @@
     "build": "rimraf dist/ && tsc",
     "start": "node dist/index.js",
     "dev": "rimraf dist/ && tsc && node dist/index.js",
-    "mcp": "node dist/mcp/index.js",
-    "mcp:dev": "tsx src/mcp/index.ts"
+    "mcp": "node dist/mcp/server.js",
+    "mcp:dev": "tsx src/mcp/server.ts"
   },
   "files": [
     "dist"
@@ -25,6 +25,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
     "@huggingface/inference": "^4.7.1",
+    "@langchain/community": "^0.3.53",
     "@langchain/core": "^0.3.72",
     "@langchain/openai": "^0.5.18",
     "@modelcontextprotocol/sdk": "^1.17.4",

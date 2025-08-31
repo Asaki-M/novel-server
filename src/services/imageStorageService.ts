@@ -21,6 +21,55 @@ class ImageStorageService {
   }
 
   /**
+   * 直接上传 Blob 到 Supabase Storage (S3 API)
+   * @param blob - Blob 对象
+   * @param sessionId - 会话ID，用于组织文件路径
+   * @returns 上传结果，包含访问URL
+   */
+  async uploadBlob(blob: Blob, sessionId?: string): Promise<ImageStorageResult> {
+    try {
+      // 生成唯一文件名
+      const timestamp = Date.now();
+      const uuid = uuidv4();
+      const filename = `${timestamp}-${uuid}.png`;
+
+      // 组织文件路径：按会话ID分组
+      const folderPath = sessionId ? `sessions/${sessionId}` : 'general';
+      const filePath = `${folderPath}/${filename}`;
+
+      // 将 Blob 转换为 ArrayBuffer，然后转为 Buffer
+      const arrayBuffer = await blob.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // 使用S3 API上传文件
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: filePath,
+        Body: buffer,
+        ContentType: blob.type || 'image/png',
+        CacheControl: 'public, max-age=3600', // 1小时缓存
+      });
+
+      await s3Client.send(command);
+
+      // 构建返回结果
+      const publicUrl = this.getPublicUrl(filePath);
+
+      console.log(`✅ Blob 上传成功: ${publicUrl}`);
+
+      return {
+        url: publicUrl,
+        publicUrl: publicUrl,
+        path: filePath
+      };
+
+    } catch (error) {
+      console.error('Blob 上传失败:', error);
+      throw new Error(`图片上传失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+
+  /**
    * 将base64图片上传到Supabase Storage (S3 API)
    * @param base64Data - base64编码的图片数据（不包含data:image/png;base64,前缀）
    * @param sessionId - 会话ID，用于组织文件路径

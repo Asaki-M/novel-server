@@ -1,0 +1,181 @@
+import { Request, Response, NextFunction } from 'express';
+import characterService from '../services/characterService.js';
+import { ApiResponse } from '../types/chat.js';
+import { CreateCharacterRequest, UpdateCharacterRequest } from '../types/character.js';
+
+/**
+ * 角色卡控制器
+ * 
+ * 专门处理角色卡的 CRUD 操作
+ * 从 chatController 中分离出来，保持单一职责
+ */
+
+/**
+ * 获取角色卡列表
+ * GET /api/characters
+ */
+export const getCharacters = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const list = await characterService.listCharacters();
+
+    const response: ApiResponse = {
+      success: true,
+      data: list
+    };
+
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 获取角色卡详情
+ * GET /api/characters/:characterId
+ */
+export const getCharacter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { characterId } = req.params;
+    
+    if (!characterId) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡ID不能为空'
+      };
+      res.status(400).json(response);
+      return;
+    }
+    
+    const character = await characterService.getCharacter(characterId);
+
+    if (!character) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡不存在'
+      };
+      res.status(404).json(response);
+      return;
+    }
+
+    const response: ApiResponse = {
+      success: true,
+      data: character
+    };
+
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 创建角色卡
+ * POST /api/characters
+ */
+export const createCharacter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const characterData: CreateCharacterRequest = req.body;
+
+    // 验证必填字段
+    if (!characterData.name || !characterData.description || !characterData.systemPrompt) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色名称、描述和系统提示词为必填项'
+      };
+      res.status(400).json(response);
+      return;
+    }
+
+    const character = await characterService.createCharacter(characterData);
+
+    const response: ApiResponse = {
+      success: true,
+      message: '角色卡创建成功',
+      data: character
+    };
+
+    res.status(201).json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 更新角色卡
+ * PUT /api/characters/:characterId
+ */
+export const updateCharacter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { characterId } = req.params;
+    const updates: UpdateCharacterRequest = req.body;
+
+    if (!characterId) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡ID不能为空'
+      };
+      res.status(400).json(response);
+      return;
+    }
+
+    const character = await characterService.updateCharacter(characterId, updates);
+
+    if (!character) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡不存在或无法修改内置角色'
+      };
+      res.status(404).json(response);
+      return;
+    }
+
+    const response: ApiResponse = {
+      success: true,
+      message: '角色卡更新成功',
+      data: character
+    };
+
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 删除角色卡
+ * DELETE /api/characters/:characterId
+ */
+export const deleteCharacter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { characterId } = req.params;
+    
+    if (!characterId) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡ID不能为空'
+      };
+      res.status(400).json(response);
+      return;
+    }
+    
+    const deleted = await characterService.deleteCharacter(characterId);
+
+    if (!deleted) {
+      const response: ApiResponse = {
+        success: false,
+        error: '角色卡不存在或无法删除内置角色'
+      };
+      res.status(404).json(response);
+      return;
+    }
+
+    const response: ApiResponse = {
+      success: true,
+      message: '角色卡删除成功'
+    };
+
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+};

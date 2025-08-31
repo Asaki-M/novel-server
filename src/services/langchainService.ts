@@ -187,6 +187,14 @@ class LangChainService {
 		}
 	}
 
+	/**
+	 * 公开方法：保存消息到数据库
+	 * 用于外部调用，比如图片生成后保存对话记录
+	 */
+	async saveMessages(sessionId: string, messages: ChatMessage[]): Promise<void> {
+		return this.appendMessages(sessionId, messages);
+	}
+
 	// 工具调用功能已移至标准 MCP 服务器
 }
 

@@ -1,26 +1,30 @@
 import { Router, Router as ExpressRouter } from 'express';
 import {
   chat,
-  chatStream,
-  getCharacters,
-  getCharacter,
-  createCharacter,
-  updateCharacter,
-  deleteCharacter
+  chatStream
 } from '../controllers/chatController.js';
+
+/**
+ * 聊天路由配置
+ *
+ * 只处理聊天相关的接口
+ * 角色卡管理已移至 characterRoutes
+ */
 
 const router: ExpressRouter = Router();
 
-// 聊天接口
-router.post('/chat', chat);           // 正常响应
-router.post('/chat/stream', chatStream); // 流式响应
+// ==================== 聊天接口 ====================
 
-// 角色卡管理
-router.get('/characters', getCharacters);           // 获取角色卡列表
-router.post('/characters', createCharacter);        // 创建角色卡
-router.get('/characters/:characterId', getCharacter); // 获取角色卡详情
-router.put('/characters/:characterId', updateCharacter); // 更新角色卡
-router.delete('/characters/:characterId', deleteCharacter); // 删除角色卡
+/**
+ * 普通聊天接口
+ * POST /api/chat
+ */
+router.post('/chat', chat);
 
+/**
+ * 流式聊天接口
+ * POST /api/chat/stream
+ */
+router.post('/chat/stream', chatStream);
 
-export default router; 
+export default router;
