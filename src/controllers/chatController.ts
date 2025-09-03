@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import langchainService from '../services/langchainService.js';
-import { ChatResponse } from '../types/chat.js';
-import { validateAndProcessChatRequest } from '../utils/requestProcessor.js';
+import type { NextFunction, Request, Response } from 'express'
+import type { ChatResponse } from '../types/chat.js'
+import langchainService from '../services/langchainService.js'
+import { validateAndProcessChatRequest } from '../utils/requestProcessor.js'
 
 /**
  * 聊天控制器
@@ -17,7 +17,7 @@ import { validateAndProcessChatRequest } from '../utils/requestProcessor.js';
  * 普通聊天接口
  * POST /api/chat
  */
-export const chat = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export async function chat(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // 使用通用的请求处理工具
     const {
@@ -25,33 +25,34 @@ export const chat = async (req: Request, res: Response, next: NextFunction): Pro
       temperature,
       max_tokens,
       sessionId,
-      systemPrompt
-    } = await validateAndProcessChatRequest(req);
+      systemPrompt,
+    } = await validateAndProcessChatRequest(req)
 
     // 使用 LangChain 服务，启用记忆功能
     const result = await langchainService.invoke(messages, {
       temperature,
       max_tokens,
       systemPrompt,
-      sessionId
-    });
+      sessionId,
+    })
 
     const response: ChatResponse = {
       success: true,
-      message: result.content
-    };
+      message: result.content,
+    }
 
-    res.json(response);
-  } catch (error) {
-    next(error);
+    res.json(response)
   }
-};
+  catch (error) {
+    next(error)
+  }
+}
 
 /**
  * 流式聊天接口
  * POST /api/chat/stream
  */
-export const chatStream = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export async function chatStream(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // 使用通用的请求处理工具
     const {
@@ -59,8 +60,8 @@ export const chatStream = async (req: Request, res: Response, next: NextFunction
       temperature,
       max_tokens,
       sessionId,
-      systemPrompt
-    } = await validateAndProcessChatRequest(req);
+      systemPrompt,
+    } = await validateAndProcessChatRequest(req)
 
     // 设置流式响应头
     res.writeHead(200, {
@@ -68,8 +69,8 @@ export const chatStream = async (req: Request, res: Response, next: NextFunction
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control'
-    });
+      'Access-Control-Allow-Headers': 'Cache-Control',
+    })
 
     // 使用 LangChain 流式响应（默认启用记忆）
     for await (const delta of langchainService.streamWithMemory(messages, {
@@ -81,19 +82,20 @@ export const chatStream = async (req: Request, res: Response, next: NextFunction
       summaryMaxTokens: 400,
     })) {
       if (delta) {
-        res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+        res.write(`data: ${JSON.stringify({ content: delta })}\n\n`)
       }
     }
 
-    res.write('data: [DONE]\n\n');
-    res.end();
-  } catch (error) {
-    if (error instanceof Error) {
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
-      return;
-    }
-    next(error);
+    res.write('data: [DONE]\n\n')
+    res.end()
   }
-};
+  catch (error) {
+    if (error instanceof Error) {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`)
+      res.write('data: [DONE]\n\n')
+      res.end()
+      return
+    }
+    next(error)
+  }
+}

@@ -1,27 +1,29 @@
 {
   "name": "novel-chat-server",
-  "version": "1.0.0",
-  "main": "dist/index.js",
   "type": "module",
-  "scripts": {
-    "build": "rimraf dist/ && tsc",
-    "start": "node dist/index.js",
-    "dev": "rimraf dist/ && tsc && node dist/index.js",
-    "mcp": "node dist/mcp/server.js",
-    "mcp:dev": "tsx src/mcp/server.ts"
-  },
-  "files": [
-    "dist"
-  ],
+  "version": "1.0.0",
+  "description": "简单的聊天服务器，支持角色卡功能",
+  "author": "",
+  "license": "ISC",
   "keywords": [
     "chat",
     "openai",
     "character",
     "roleplay"
   ],
-  "author": "",
-  "license": "ISC",
-  "description": "简单的聊天服务器，支持角色卡功能",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rimraf dist/ && tsc",
+    "start": "node dist/index.js",
+    "dev": "rimraf dist/ && tsc && node dist/index.js",
+    "mcp": "node dist/mcp/server.js",
+    "mcp:dev": "tsx src/mcp/server.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
     "@huggingface/inference": "^4.7.1",
@@ -38,10 +40,12 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^5.2.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^22.14.1",
     "@types/uuid": "^10.0.0",
+    "eslint": "^9.34.0",
     "rimraf": "^6.0.1",
     "tsx": "^4.20.5",
     "typescript": "^5.8.3"

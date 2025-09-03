@@ -1,27 +1,28 @@
-import { Router, Router as ExpressRouter } from 'express';
+import type { Router as ExpressRouter } from 'express'
+import { Router } from 'express'
 import {
-  getCharacters,
-  getCharacter,
   createCharacter,
+  deleteCharacter,
+  getCharacter,
+  getCharacters,
   updateCharacter,
-  deleteCharacter
-} from '../controllers/characterController.js';
+} from '../controllers/characterController.js'
 
 /**
  * 角色卡路由配置
- * 
+ *
  * 提供角色卡的 CRUD 操作接口
  */
 
-const router: ExpressRouter = Router();
+const router: ExpressRouter = Router()
 
 // ==================== 角色卡 CRUD 接口 ====================
 
 /**
  * 获取角色卡列表
- * 
+ *
  * GET /api/characters
- * 
+ *
  * 响应示例：
  * {
  *   "success": true,
@@ -39,13 +40,13 @@ const router: ExpressRouter = Router();
  *   ]
  * }
  */
-router.get('/', getCharacters);
+router.get('/', getCharacters)
 
 /**
  * 获取角色卡详情
- * 
+ *
  * GET /api/characters/:characterId
- * 
+ *
  * 响应示例：
  * {
  *   "success": true,
@@ -61,13 +62,13 @@ router.get('/', getCharacters);
  *   }
  * }
  */
-router.get('/:characterId', getCharacter);
+router.get('/:characterId', getCharacter)
 
 /**
  * 创建角色卡
- * 
+ *
  * POST /api/characters
- * 
+ *
  * 请求体示例：
  * {
  *   "name": "角色名称",
@@ -75,7 +76,7 @@ router.get('/:characterId', getCharacter);
  *   "systemPrompt": "系统提示词",
  *   "avatar": "头像URL（可选）"
  * }
- * 
+ *
  * 响应示例：
  * {
  *   "success": true,
@@ -92,13 +93,13 @@ router.get('/:characterId', getCharacter);
  *   }
  * }
  */
-router.post('/', createCharacter);
+router.post('/', createCharacter)
 
 /**
  * 更新角色卡
- * 
+ *
  * PUT /api/characters/:characterId
- * 
+ *
  * 请求体示例：
  * {
  *   "name": "新的角色名称",
@@ -106,7 +107,7 @@ router.post('/', createCharacter);
  *   "systemPrompt": "新的系统提示词",
  *   "avatar": "新的头像URL"
  * }
- * 
+ *
  * 响应示例：
  * {
  *   "success": true,
@@ -123,19 +124,19 @@ router.post('/', createCharacter);
  *   }
  * }
  */
-router.put('/:characterId', updateCharacter);
+router.put('/:characterId', updateCharacter)
 
 /**
  * 删除角色卡
- * 
+ *
  * DELETE /api/characters/:characterId
- * 
+ *
  * 响应示例：
  * {
  *   "success": true,
  *   "message": "角色卡删除成功"
  * }
  */
-router.delete('/:characterId', deleteCharacter);
+router.delete('/:characterId', deleteCharacter)
 
-export default router;
+export default router

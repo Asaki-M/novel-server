@@ -142,15 +142,15 @@ const reader = response.body.getReader();
 while (true) {
   const { done, value } = await reader.read();
   if (done) break;
-  
+
   const chunk = new TextDecoder().decode(value);
   const lines = chunk.split('\n');
-  
+
   for (const line of lines) {
     if (line.startsWith('data: ')) {
       const data = line.slice(6);
       if (data === '[DONE]') return;
-      
+
       try {
         const parsed = JSON.parse(data);
         console.log(parsed.content);
@@ -535,27 +535,30 @@ async function streamChat() {
       characterId: 'character-uuid',
       sessionId: 'session-uuid'
     })
-  });
+  })
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
 
   while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    const { done, value } = await reader.read()
+    if (done)
+      break
 
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n');
+    const chunk = decoder.decode(value)
+    const lines = chunk.split('\n')
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
-        const data = line.slice(6);
-        if (data === '[DONE]') return;
+        const data = line.slice(6)
+        if (data === '[DONE]')
+          return
 
         try {
-          const parsed = JSON.parse(data);
-          console.log(parsed.content);
-        } catch (e) {
+          const parsed = JSON.parse(data)
+          console.log(parsed.content)
+        }
+        catch (e) {
           // 忽略解析错误
         }
       }
