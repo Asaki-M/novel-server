@@ -1,5 +1,4 @@
-#!/usr/bin/env node
-
+import process from 'node:process'
 import { InferenceClient } from '@huggingface/inference'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
