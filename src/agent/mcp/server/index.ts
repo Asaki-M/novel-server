@@ -5,6 +5,10 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import cors from 'cors'
 import express from 'express'
 
+import { createLogger } from '@/utils/logger.js'
+
+const logger = createLogger('MCPServer')
+
 export class MCPServer {
   private name: string
   private version: string
@@ -106,7 +110,7 @@ export class MCPServer {
     // 启动MCP服务
     return new Promise((resolve) => {
       this.app.listen(port, host, () => {
-        console.log(`[Mcp Server] 启动成功，监听端口: ${port}, 地址: ${host}`)
+        logger.info(`启动成功，监听端口: ${port}, 地址: ${host}`)
         resolve()
       })
     })
