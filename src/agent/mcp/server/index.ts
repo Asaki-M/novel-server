@@ -5,18 +5,15 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import cors from 'cors'
 import express from 'express'
 
-import { createLogger } from '@/utils/logger.js'
-
-const logger = createLogger('MCPServer')
-
 export class MCPServer {
-  private name: string
-  private version: string
   private app: express.Application
+  private mcpServer: McpServer
 
   constructor(name: string, version: string) {
-    this.name = name
-    this.version = version
+    this.mcpServer = new McpServer({
+      name,
+      version,
+    })
     this.app = express()
     this.setupMiddleware()
     this.setupRoutes()
@@ -65,15 +62,11 @@ export class MCPServer {
             delete transports[transport.sessionId]
           }
         }
-        const server = new McpServer({
-          name: this.name,
-          version: this.version,
-        })
 
         // ... set up server resources, tools, and prompts ...
 
         // Connect to the MCP server
-        await server.connect(transport)
+        await this.mcpServer.connect(transport)
       }
       else {
         // Invalid request
@@ -102,15 +95,18 @@ export class MCPServer {
       await transport.handleRequest(req, res)
     }
 
-    this.app.post('/mcp', handleSessionRequest)
+    this.app.delete('/mcp', handleSessionRequest)
     this.app.get('/mcp', handleSessionRequest)
+  }
+
+  public get mcp(): McpServer {
+    return this.mcpServer
   }
 
   public listen(port: number, host: string): Promise<void> {
     // 启动MCP服务
     return new Promise((resolve) => {
       this.app.listen(port, host, () => {
-        logger.info(`启动成功，监听端口: ${port}, 地址: ${host}`)
         resolve()
       })
     })

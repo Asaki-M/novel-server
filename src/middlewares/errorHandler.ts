@@ -1,4 +1,4 @@
-export function errorHandler(error: any, req: any, res: any, next: any): void {
+export function errorHandler(error: any, req: any, res: any): void {
   console.error('API错误:', error)
 
   let statusCode = 500

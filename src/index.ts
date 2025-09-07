@@ -3,13 +3,16 @@ import process from 'node:process'
 import cors from 'cors'
 import express from 'express'
 
+import { initLLM } from './agent/llm/index.js'
+import { startAllMCP } from './agent/mcp/tools/index.js'
 import config, { validateConfig } from './config/index.js'
+import AgentChatController from './controllers/agentChatController.js'
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js'
 import routes from './routes/index.js'
 import imageStorageService from './services/imageStorageService.js'
 
 // 创建 Express 应用
-const app: Express = express()
+export const app: Express = express()
 
 // 验证配置
 try {
@@ -51,15 +54,25 @@ app.use('/', routes)
 app.use(notFoundHandler)
 
 // 错误处理中间件
-app.use(errorHandler)
+app.use(errorHandler);
+
+// 启动 MCP 服务
+(async () => {
+  const mcpServersConfig = await startAllMCP()
+  const llm = initLLM()
+
+  const agentChatController = new AgentChatController(llm, mcpServersConfig)
+  await agentChatController.init()
+
+  // 将controller实例绑定到app上，供路由使用
+  app.set('agentChatController', agentChatController)
+})()
 
 // 仅在本地/非 Serverless 环境启动监听
 const isVercel = process.env['VERCEL'] === '1'
 if (!isVercel) {
   const server = app.listen(config.port, () => {
-    console.log(`🚀 小说服务器启动成功！`)
     console.log(`📡 服务地址: http://localhost:${config.port}`)
-    console.log(`💬 聊天接口: http://localhost:${config.port}/api/chat`)
   })
 
   // 优雅关闭

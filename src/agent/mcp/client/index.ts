@@ -1,7 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 
-import { createLogger } from '@/utils/logger.js'
+import { createLogger } from '../../../utils/logger.js'
 
 const logger = createLogger('MCPClient')
 
@@ -29,8 +29,8 @@ export class MCPClient {
       await this.client?.connect(transport as any)
       logger.info('连接成功, url: ', url)
     }
-    catch {
-      logger.error('连接失败, url: ', url)
+    catch (err) {
+      logger.error('连接失败, url: ', url, err)
     }
   }
 

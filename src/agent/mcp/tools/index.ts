@@ -1,7 +1,21 @@
-export { generate_image } from './generate_image.js'
-export { get_weather } from './weather.js'
+import { startGenerateImageMCP } from './generate-image/index.js'
+import { startWeatherMCP } from './weather.js'
 
-export interface GenerateImageMCPResponse {
-  type: string
-  text: string
+export async function startAllMCP() {
+  const mcpServersDescrition = [
+    {
+      name: 'generate_image',
+      starter: startGenerateImageMCP,
+    },
+    {
+      name: 'weather',
+      starter: startWeatherMCP,
+    },
+  ]
+
+  const mcpServersConfig = await Promise.all(mcpServersDescrition.map(async ({ starter }) => {
+    return await starter()
+  }))
+
+  return mcpServersConfig
 }
