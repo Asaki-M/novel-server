@@ -3,7 +3,7 @@ import supabase from '../config/supabase.js'
 import { createLogger } from '../utils/logger.js'
 import characterService from './characterService.js'
 
-const logger = createLogger('SupabaseController')
+const logger = createLogger('SupabaseService')
 
 class SupabaseController {
   /**

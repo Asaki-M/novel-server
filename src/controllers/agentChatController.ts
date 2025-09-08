@@ -1,8 +1,8 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { Request, Response } from 'express'
-import type { ExternalMcpServerConfig } from '../agent/mcp/client/index.js'
+import type { ExternalMcpServerConfig } from '../agent/index.js'
 import type { ChatMessage } from '../types/chat.js'
-import { Agent } from '../agent/agent.js'
+import { Agent } from '../agent/index.js'
 import supabaseService from '../services/supabaseService.js'
 import { createLogger } from '../utils/logger.js'
 
@@ -145,6 +145,7 @@ class AgentChatController {
   }
 
   public streamChat() {
+    // TODO
     console.log('stream chat')
   }
 }

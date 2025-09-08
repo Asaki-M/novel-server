@@ -1,6 +1,9 @@
 import { DeleteObjectsCommand, ListBucketsCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
 import { v4 as uuidv4 } from 'uuid'
 import s3Client from '../config/s3.js'
+import { createLogger } from '../utils/logger.js'
+
+const logger = createLogger('ImageStorageService')
 
 export interface ImageStorageResult {
   url: string
@@ -56,7 +59,7 @@ class ImageStorageService {
       // 构建返回结果
       const publicUrl = this.getPublicUrl(filePath)
 
-      console.log(`✅ Blob 上传成功: ${publicUrl}`)
+      logger.info(`✅ Blob 上传成功: ${publicUrl}`)
 
       return {
         url: publicUrl,
@@ -101,7 +104,7 @@ class ImageStorageService {
       await s3Client.send(deleteCommand)
     }
     catch (error: any) {
-      console.error('清理会话图片错误:', error)
+      logger.error('清理会话图片错误:', error)
     }
   }
 
@@ -119,7 +122,7 @@ class ImageStorageService {
         const bucketExists = bucketsResult.Buckets.some(bucket => bucket.Name === this.bucketName)
 
         if (!bucketExists) {
-          console.warn(`❌ 未找到目标Storage桶: ${this.bucketName}`)
+          logger.error(`❌ 未找到目标Storage桶: ${this.bucketName}`)
           throw new Error(`存储桶 ${this.bucketName} 不存在`)
         }
       }
@@ -133,10 +136,10 @@ class ImageStorageService {
       })
 
       await s3Client.send(command)
-      console.log(`✅ Supabase Storage桶 ${this.bucketName} 访问正常 (S3 API)`)
+      logger.info(`✅ Storage桶 ${this.bucketName} 存在且可访问`)
     }
     catch (error: any) {
-      console.error('🚨 Storage桶检查错误:', error)
+      logger.error('❌ Storage桶检查错误:', error)
     }
   }
 }
