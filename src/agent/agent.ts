@@ -90,28 +90,16 @@ export class Agent {
       }
 
       const [, toolName, paramsStr] = match
-      let params: any[] = []
 
+      let toolParams: any = {}
       if (paramsStr && paramsStr.trim()) {
         try {
-          // 简单的参数解析，支持字符串和数字
-          params = paramsStr.split(',').map((p) => {
-            const trimmed = p.trim()
-            if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-              return trimmed.slice(1, -1)
-            }
-            if (trimmed.startsWith('\'') && trimmed.endsWith('\'')) {
-              return trimmed.slice(1, -1)
-            }
-            if (!Number.isNaN(Number(trimmed))) {
-              return Number(trimmed)
-            }
-            return trimmed
-          })
+          // 参数应该是 JSON 格式，比如: {"city": "北京"}
+          toolParams = JSON.parse(paramsStr)
         }
         catch (error) {
           logger.error('解析工具参数失败:', error)
-          return `错误：无法解析工具参数: ${paramsStr ?? ''}`
+          return `错误：无法解析工具参数，参数应该是有效的 JSON 格式: ${paramsStr ?? ''}`
         }
       }
 
@@ -123,14 +111,13 @@ export class Agent {
       let clientName = ''
       let toolFound = false
 
-      for (const [client, tools] of Object.entries(allTools)) {
-        if (tools && typeof tools === 'object') {
-          for (const tool of Object.values(tools)) {
-            if (typeof tool === 'object' && tool !== null && 'name' in tool && tool.name === toolName) {
-              clientName = client
-              toolFound = true
-              break
-            }
+      for (const [client, clientToolObject] of Object.entries(allTools)) {
+        if (clientToolObject && clientToolObject?.tools) {
+          const tool = clientToolObject.tools.find((_tool: any) => _tool.name === toolName)
+          if (tool) {
+            clientName = client
+            toolFound = true
+            break
           }
         }
         if (toolFound) {
@@ -142,7 +129,7 @@ export class Agent {
         return `错误：未找到工具: ${toolName}`
       }
 
-      const result = await mcpClientManager.callTool(clientName, toolName as string, params)
+      const result = await mcpClientManager.callTool(clientName, toolName as string, toolParams)
       return JSON.stringify(result, null, 2)
     }
     catch (error) {
@@ -173,7 +160,7 @@ export class Agent {
   /**
    * ReAct模式聊天
    * @param messages 消息列表
-   * @param options 聊天选项
+   * @param _options 聊天选项
    * @returns 聊天响应
    */
   public async chat(messages: ChatMessage[], _options?: AgentChatOptions): Promise<AgentChatResponse> {

@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, DeleteObjectsCommand, ListBucketsCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
+import { DeleteObjectsCommand, ListBucketsCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
 import { v4 as uuidv4 } from 'uuid'
 import s3Client from '../config/s3.js'
 
@@ -67,89 +67,6 @@ class ImageStorageService {
     catch (error) {
       console.error('Blob 上传失败:', error)
       throw new Error(`图片上传失败: ${error instanceof Error ? error.message : '未知错误'}`)
-    }
-  }
-
-  /**
-   * 将base64图片上传到Supabase Storage (S3 API)
-   * @param base64Data - base64编码的图片数据（不包含data:image/png;base64,前缀）
-   * @param sessionId - 会话ID，用于组织文件路径
-   * @returns 上传结果，包含访问URL
-   */
-  async uploadBase64Image(base64Data: string, sessionId?: string): Promise<ImageStorageResult> {
-    try {
-      // 生成唯一文件名
-      const timestamp = Date.now()
-      const uuid = uuidv4()
-      const filename = `${timestamp}-${uuid}.png`
-
-      // 组织文件路径：按会话ID分组
-      const folderPath = sessionId ? `sessions/${sessionId}` : 'general'
-      const filePath = `${folderPath}/${filename}`
-
-      // 将base64转换为Buffer
-      // eslint-disable-next-line node/prefer-global/buffer
-      const buffer = Buffer.from(base64Data, 'base64')
-
-      // 使用S3 API上传文件
-      const command = new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: filePath,
-        Body: buffer,
-        ContentType: 'image/png',
-        CacheControl: 'public, max-age=3600', // 1小时缓存
-      })
-
-      await s3Client.send(command)
-
-      // 生成公开访问URL
-      const publicUrl = this.getPublicUrl(filePath)
-
-      return {
-        url: publicUrl,
-        publicUrl,
-        path: filePath,
-      }
-    }
-    catch (error: any) {
-      console.error('图片存储服务错误:', error)
-      throw new Error(`图片存储失败: ${error.message}`)
-    }
-  }
-
-  /**
-   * 处理data URL格式的图片（包含data:image/png;base64,前缀）
-   * @param dataUrl - 完整的data URL
-   * @param sessionId - 会话ID（可选）
-   * @returns 上传结果
-   */
-  async uploadDataUrl(dataUrl: string, sessionId?: string): Promise<ImageStorageResult> {
-    // 提取base64数据
-    const base64Match = dataUrl.match(/^data:image\/[a-zA-Z]*;base64,(.+)$/)
-    if (!base64Match || !base64Match[1]) {
-      throw new Error('无效的data URL格式')
-    }
-
-    const base64Data: string = base64Match[1]
-    return this.uploadBase64Image(base64Data, sessionId)
-  }
-
-  /**
-   * 删除指定路径的图片
-   * @param filePath - 文件路径
-   */
-  async deleteImage(filePath: string): Promise<void> {
-    try {
-      const command = new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: filePath,
-      })
-
-      await s3Client.send(command)
-    }
-    catch (error: any) {
-      console.error('图片删除服务错误:', error)
-      throw new Error(`图片删除失败: ${error.message}`)
     }
   }
 

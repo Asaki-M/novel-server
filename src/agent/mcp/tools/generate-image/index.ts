@@ -2,6 +2,7 @@ import process from 'node:process'
 import { InferenceClient } from '@huggingface/inference'
 import getPort, { portNumbers } from 'get-port'
 import { z } from 'zod'
+import imageStorageService from '../../../../services/imageStorageService.js'
 import { createLogger } from '../../../../utils/logger.js'
 import { MCPServer } from '../../../mcp/server/index.js'
 
@@ -28,6 +29,7 @@ export async function startGenerateImageMCP() {
 
     const client = new InferenceClient(token)
     logger.info('生成图片开始, 模型使用starsfriday/Qwen-Image-NSFW')
+    // 生图
     const output = await client.textToImage({
       provider: 'auto',
       model: 'starsfriday/Qwen-Image-NSFW',
@@ -38,7 +40,20 @@ export async function startGenerateImageMCP() {
       },
     })
 
-    if (!output) {
+    const outputBlob = output as any
+    const validateOutput = outputBlob && typeof outputBlob === 'object' && outputBlob.constructor?.name === 'Blob'
+    if (!validateOutput) {
+      logger.error('生成图片失败')
+      return {
+        content: [{
+          type: 'text',
+          text: '生成图片失败',
+        }],
+      }
+    }
+    // 上传图片，获取图片地址
+    const imageStorageResult = await imageStorageService.uploadBlob(outputBlob)
+    if (!imageStorageResult) {
       logger.error('生成图片失败')
       return {
         content: [{
@@ -51,7 +66,7 @@ export async function startGenerateImageMCP() {
     return {
       content: [{
         type: 'text',
-        text: '生成图片失败',
+        text: `图片地址: ${imageStorageResult.url}`,
       }],
     }
   })
