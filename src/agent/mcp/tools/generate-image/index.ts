@@ -66,7 +66,8 @@ export async function startGenerateImageMCP() {
     return {
       content: [{
         type: 'text',
-        text: `图片地址: ${imageStorageResult.url}`,
+        // mcp 工具返回图片地址后，llm 可能自己偷偷改动地址，所以加一个限制一下 llm
+        text: `图片地址: ${imageStorageResult.url}，如果是 final_answer 请保持该图片地址不变，完全一致的返回。`,
       }],
     }
   })
