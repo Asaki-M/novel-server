@@ -1,6 +1,7 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { Request, Response } from 'express'
 import type { ExternalMcpServerConfig } from '../agent/index.js'
+import type { Character } from '../types/character.js'
 import type { ChatMessage } from '../types/chat.js'
 import { Agent } from '../agent/index.js'
 import supabaseService from '../services/supabaseService.js'
@@ -101,7 +102,11 @@ class AgentChatController {
 
     try {
       const history = await supabaseService.getSessionHistory(sessionId)
-      const characterPrompt = await supabaseService.getCharacterPrompt(characterId)
+      const characterInfo: Character | null = await supabaseService.getCharacterInfo(characterId)
+      let characterPrompt = ''
+      if (characterInfo) {
+        characterPrompt = characterInfo.systemPrompt
+      }
 
       const messageList = this.buildMessages(
         `<task>${message}</task>`,
@@ -131,7 +136,8 @@ class AgentChatController {
       return res.status(200).json({
         success: true,
         data: {
-          response: agentResponse.finalAnswer || agentResponse.content,
+          character: characterInfo,
+          message: agentResponse.finalAnswer || agentResponse.content,
           usage: agentResponse.usage,
         },
       })

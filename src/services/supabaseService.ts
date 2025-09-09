@@ -1,3 +1,4 @@
+import type { Character } from '../types/character.js'
 import type { ChatMessage } from '../types/chat.js'
 import supabase from '../config/supabase.js'
 import { createLogger } from '../utils/logger.js'
@@ -67,28 +68,28 @@ class SupabaseController {
   }
 
   /**
-   * 通过角色卡id获取对应的prompt
+   * 通过角色卡id获取对应的角色信息
    * @param characterId
    */
-  public async getCharacterPrompt(characterId: string): Promise<string> {
+  public async getCharacterInfo(characterId: string): Promise<Character | null> {
     if (!characterId) {
-      return ''
+      return null
     }
 
     try {
       const character = await characterService.getCharacter(characterId)
       if (character) {
         logger.info(`使用了角色卡：${character.name}`)
-        return character.systemPrompt
+        return character
       }
       else {
         logger.warn(`角色卡不存在: ${characterId}`)
-        return ''
+        return null
       }
     }
     catch (error) {
       logger.error(`获取角色卡失败: ${error}`)
-      return ''
+      return null
     }
   }
 }
