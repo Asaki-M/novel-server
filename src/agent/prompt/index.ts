@@ -23,6 +23,7 @@ export function getReActModePrompt(toolListStr: string) {
 
 请严格遵守：
 - 你每次回答都必须包括两个标签，第一个是 <thought>，第二个是 <action> 或 <final_answer>
+- 必须使用正确的XML标签格式：<action>工具调用</action>，不要使用 [action> 或其他格式
 - 输出 <action> 后立即停止生成，等待真实的 <observation>，擅自生成 <observation> 将导致错误
 - 如果 <action> 中的某个工具参数有多行的话，请使用 \n 来表示，如：<action>write_to_file("/tmp/test.txt", "a\nb\nc")</action>
 - 工具参数中的文件路径请使用绝对路径，不要只给出一个文件名。比如要写 write_to_file("/tmp/test.txt", "内容")，而不是 write_to_file("test.txt", "内容")

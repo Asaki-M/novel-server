@@ -19,4 +19,15 @@ router.post('/agent/chat', (req: Request, res: Response) => {
   return agentChatController.chat(req, res)
 })
 
+router.post('/agent/chat/stream', (req: Request, res: Response) => {
+  const agentChatController = req.app.get('agentChatController') as AgentChatController
+  if (!agentChatController) {
+    return res.status(500).json({
+      success: false,
+      message: 'Agent chat controller not initialized',
+    })
+  }
+  return agentChatController.streamChat(req, res)
+})
+
 export default router

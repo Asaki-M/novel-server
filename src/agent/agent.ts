@@ -26,6 +26,19 @@ export interface AgentChatResponse {
   }
 }
 
+export interface AgentStreamChunk {
+  type: 'thinking' | 'action' | 'observation' | 'final_answer' | 'error'
+  content: string
+  iteration?: number
+  action?: string
+  isComplete?: boolean
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+  }
+}
+
 export class Agent {
   private llm: BaseChatModel
   private systemPrompt: string
@@ -70,9 +83,19 @@ export class Agent {
     const actionMatch = content.match(/<action>(.*?)<\/action>/s)
     const finalAnswerMatch = content.match(/<final_answer>(.*?)<\/final_answer>/s)
 
+    // 处理错误格式：[action>...] 或 [action>...</action>
+    let action = actionMatch?.[1]?.trim()
+    if (!action) {
+      const malformedActionMatch = content.match(/\[action>(.*?)(?:<\/action>|\])/s)
+      if (malformedActionMatch) {
+        action = malformedActionMatch[1]?.trim()
+        logger.warn('检测到错误的action格式，已自动修正:', malformedActionMatch[0])
+      }
+    }
+
     return {
       thought: thoughtMatch?.[1]?.trim(),
-      action: actionMatch?.[1]?.trim(),
+      action,
       finalAnswer: finalAnswerMatch?.[1]?.trim(),
       isComplete: !!finalAnswerMatch,
     }
@@ -259,6 +282,152 @@ export class Agent {
     logger.warn(`达到最大迭代次数 ${MAX_ITERATIONS}，强制结束`)
     return {
       content: '抱歉，我需要更多时间来思考这个问题，请稍后再试。',
+      isComplete: true,
+      usage: {
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        total_tokens: totalTokens,
+      },
+    }
+  }
+
+  /**
+   * ReAct模式流式聊天
+   * @param messages 消息列表
+   * @param _options 聊天选项
+   * @returns 异步生成器，产生流式响应块
+   */
+  public async* streamChat(messages: ChatMessage[], _options?: AgentChatOptions): AsyncGenerator<AgentStreamChunk> {
+    const MAX_ITERATIONS = 8 // 最大循环次数，防止无限循环
+    const currentMessages = [...messages]
+    let totalTokens = 0
+    let promptTokens = 0
+    let completionTokens = 0
+
+    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+      try {
+        logger.info(`开始第 ${iteration + 1} 轮思考...`)
+        yield {
+          type: 'thinking',
+          content: `开始第 ${iteration + 1} 轮思考...`,
+          iteration: iteration + 1,
+        }
+
+        // 转换为LangChain消息格式
+        const langChainMessages = this.convertToLangChainMessages(currentMessages)
+
+        // 调用LLM获取响应
+        const response = await this.llm.invoke(langChainMessages)
+
+        const content = response.content?.toString() || ''
+
+        logger.info(`第 ${iteration + 1} 轮响应:`, content)
+        yield {
+          type: 'thinking',
+          content: `第 ${iteration + 1} 轮响应: ${content}`,
+          iteration: iteration + 1,
+        }
+
+        // 累计token使用量
+        if (response.usage_metadata) {
+          promptTokens += response.usage_metadata.input_tokens || 0
+          completionTokens += response.usage_metadata.output_tokens || 0
+          totalTokens += response.usage_metadata.total_tokens || 0
+        }
+
+        // 解析响应
+        const parsedResponse = this.parseResponse(content)
+        logger.info('解析结果:', {
+          hasThought: !!parsedResponse.thought,
+          hasAction: !!parsedResponse.action,
+          hasFinalAnswer: !!parsedResponse.finalAnswer,
+          isComplete: parsedResponse.isComplete,
+          action: parsedResponse.action,
+        })
+
+        // 如果已经有最终答案，直接返回
+        if (parsedResponse.isComplete && parsedResponse.finalAnswer) {
+          logger.info('获得最终答案，结束思考循环', parsedResponse.finalAnswer)
+          yield {
+            type: 'final_answer',
+            content: parsedResponse.finalAnswer,
+            isComplete: true,
+            usage: {
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+              total_tokens: totalTokens,
+            },
+          }
+          return
+        }
+
+        // 如果有action，执行工具调用
+        if (parsedResponse.action) {
+          logger.info(`执行工具调用: ${parsedResponse.action}`)
+          yield {
+            type: 'action',
+            content: `执行工具调用: ${parsedResponse.action}`,
+            action: parsedResponse.action,
+            iteration: iteration + 1,
+          }
+
+          const observation = await this.executeTool(parsedResponse.action)
+
+          yield {
+            type: 'observation',
+            content: observation,
+            iteration: iteration + 1,
+          }
+
+          // 将助手的思考和行动添加到消息历史
+          currentMessages.push({
+            role: 'assistant',
+            content,
+          })
+
+          // 添加观察结果
+          currentMessages.push({
+            role: 'user',
+            content: `<observation>${observation}</observation>`,
+          })
+        }
+        else {
+          // 如果没有action也没有final_answer，说明格式有问题
+          logger.error('响应格式不正确, 缺少action或final_answer')
+          yield {
+            type: 'error',
+            content: '响应格式不正确, 缺少action或final_answer',
+            isComplete: true,
+            usage: {
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+              total_tokens: totalTokens,
+            },
+          }
+          return
+        }
+      }
+      catch (error) {
+        logger.error(`第 ${iteration + 1} 轮思考发生错误:`, error)
+        yield {
+          type: 'error',
+          content: `第 ${iteration + 1} 轮思考发生错误: ${error}`,
+          isComplete: true,
+          usage: {
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+            total_tokens: totalTokens,
+          },
+        }
+        return
+      }
+    }
+
+    // 如果达到最大迭代次数仍未完成
+    logger.warn(`达到最大迭代次数 ${MAX_ITERATIONS}，强制结束`)
+    yield {
+      type: 'error',
+      content: `达到最大迭代次数 ${MAX_ITERATIONS}，强制结束`,
       isComplete: true,
       usage: {
         prompt_tokens: promptTokens,

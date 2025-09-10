@@ -150,9 +150,109 @@ class AgentChatController {
     }
   }
 
-  public streamChat() {
-    // TODO
-    console.log('stream chat')
+  /**
+   * 流式聊天请求函数
+   */
+  public async streamChat(req: Request, res: Response): Promise<void> {
+    const { sessionId, characterId, message } = req.body as ChatRequestBody
+    const { status, errorMessage } = this.validateChatRequest(req.body)
+
+    if (status !== 200 && errorMessage) {
+      res.status(status).json({
+        message: errorMessage,
+      })
+      return
+    }
+
+    try {
+      // 设置流式响应头
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control',
+      })
+
+      const history = await supabaseService.getSessionHistory(sessionId)
+      const characterInfo: Character | null = await supabaseService.getCharacterInfo(characterId)
+      let characterPrompt = ''
+      if (characterInfo) {
+        characterPrompt = characterInfo.systemPrompt
+      }
+
+      const messageList = this.buildMessages(
+        `<task>${message}</task>`,
+        history,
+        {
+          reactSystemPrompt: this.agent.getReActSystemPrompt(),
+          characterSystemPrompt: characterPrompt,
+        },
+      )
+
+      let finalAnswer = ''
+      let hasError = false
+
+      // 使用Agent的流式ReAct模式进行聊天
+      for await (const chunk of this.agent.streamChat(messageList)) {
+        // 发送流式数据
+        res.write(`data: ${JSON.stringify({
+          type: chunk.type,
+          content: chunk.content,
+          iteration: chunk.iteration,
+          action: chunk.action,
+          isComplete: chunk.isComplete,
+          usage: chunk.usage,
+        })}\n\n`)
+
+        // 记录最终答案
+        if (chunk.type === 'final_answer') {
+          finalAnswer = chunk.content
+        }
+
+        // 记录错误状态
+        if (chunk.type === 'error') {
+          hasError = true
+          finalAnswer = chunk.content
+        }
+
+        // 如果完成，跳出循环
+        if (chunk.isComplete) {
+          break
+        }
+      }
+
+      // 保存用户消息和助手回复到数据库
+      if (finalAnswer && !hasError) {
+        await supabaseService.saveSessionMessages(sessionId, [
+          {
+            role: 'user',
+            content: message,
+          },
+          {
+            role: 'assistant',
+            content: finalAnswer,
+          },
+        ])
+      }
+
+      // 发送完成信号
+      res.write('data: [DONE]\n\n')
+      res.end()
+    }
+    catch (error) {
+      logger.error('Stream chat error:', error)
+
+      // 发送错误信息
+      res.write(`data: ${JSON.stringify({
+        type: 'error',
+        content: 'Internal server error',
+        isComplete: true,
+      })}\n\n`)
+
+      res.write('data: [DONE]\n\n')
+      res.end()
+    }
   }
 }
 
