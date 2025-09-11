@@ -12,6 +12,9 @@
 - 📊 **Token 统计**：完整的 API 使用量监控
 - 🔒 **类型安全**：完整的 TypeScript 类型定义和参数校验
 
+## Develop Blog
+[`BLOG.md`](./BLOG.md)
+
 ## 架构概览
 
 ### ReAct Agent 工作流程
