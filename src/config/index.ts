@@ -22,7 +22,7 @@ const config: Config = {
   openrouter: {
     apiKey: process.env['OPENROUTER_API_KEY'] ?? '',
     baseUrl: 'https://openrouter.ai/api/v1',
-    model: process.env['OPENROUTER_MODEL'] ?? 'qwen/qwq-32b:free',
+    model: process.env['OPENROUTER_MODEL'] ?? 'google/gemma-3n-e2b-it:free',
   },
   app: {
     name: 'Novel Server Chat API',
