@@ -2,6 +2,7 @@
   "name": "novel-chat-server",
   "type": "module",
   "version": "1.0.0",
+  "packageManager": "pnpm@10.17.1+sha512.17c560fca4867ae9473a3899ad84a88334914f379be46d455cbf92e5cf4b39d34985d452d2583baf19967fa76cb5c17bc9e245529d0b98745721aa7200ecaf7a",
   "description": "简单的聊天服务器，支持角色卡功能",
   "author": "",
   "license": "ISC",
@@ -37,6 +38,7 @@
     "express": "^4.21.2",
     "get-port": "^7.1.0",
     "langchain": "^0.3.31",
+    "node-fetch": "^3.3.2",
     "uuid": "^11.1.0",
     "zod": "^3.23.8"
   },
@@ -50,6 +52,5 @@
     "rimraf": "^6.0.1",
     "tsx": "^4.20.5",
     "typescript": "^5.8.3"
-  },
-  "packageManager": "pnpm@10.17.1+sha512.17c560fca4867ae9473a3899ad84a88334914f379be46d455cbf92e5cf4b39d34985d452d2583baf19967fa76cb5c17bc9e245529d0b98745721aa7200ecaf7a"
+  }
 }

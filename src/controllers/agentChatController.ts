@@ -1,9 +1,11 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { Request, Response } from 'express'
 import type { ExternalMcpServerConfig } from '../agent/index.js'
+import type { RAGSearchDocument } from '../services/ragService.js'
 import type { Character } from '../types/character.js'
 import type { ChatMessage } from '../types/chat.js'
 import { Agent } from '../agent/index.js'
+import ragService from '../services/ragService.js'
 import supabaseService from '../services/supabaseService.js'
 import { createLogger } from '../utils/logger.js'
 
@@ -13,6 +15,7 @@ interface ChatRequestBody {
   sessionId: string
   characterId: string
   message: string
+  knowledgeName?: string
 }
 
 class AgentChatController {
@@ -66,7 +69,7 @@ class AgentChatController {
    */
   public buildMessages(userMessage: string, history: ChatMessage[], systemPrompt: Record<string, string>): ChatMessage[] {
     const messages: ChatMessage[] = []
-    const { reactSystemPrompt, characterSystemPrompt } = systemPrompt
+    const { reactSystemPrompt, characterSystemPrompt, knowledgeDocumentsSystemPrompt } = systemPrompt
 
     // 添加ReAct系统提示词
     if (reactSystemPrompt) {
@@ -78,6 +81,11 @@ class AgentChatController {
       messages.push({ role: 'system', content: characterSystemPrompt })
     }
 
+    // 添加知识库文档系统提示词
+    if (knowledgeDocumentsSystemPrompt) {
+      messages.push({ role: 'system', content: knowledgeDocumentsSystemPrompt })
+    }
+
     // 添加历史对话
     messages.push(...history)
 
@@ -87,11 +95,19 @@ class AgentChatController {
     return messages
   }
 
+  private buildKnowledgeDocumentsSystemPrompt(documents: RAGSearchDocument[]) {
+    const documentsText = documents.map((doc: RAGSearchDocument, index: number) =>
+      `文档 ${index + 1} (相关度: ${doc.relevance_score}):\n${doc.document.text}`,
+    ).join('\n\n---\n\n')
+
+    return `以下是相关的知识库文档，请基于这些文档内容回答用户的问题，不要编造信息：\n\n${documentsText}`
+  }
+
   /**
    * 普通聊天请求函数
    */
   public async chat(req: Request, res: Response) {
-    const { sessionId, characterId, message } = req.body as ChatRequestBody
+    const { sessionId, characterId, message, knowledgeName } = req.body as ChatRequestBody
     const { status, errorMessage } = this.validateChatRequest(req.body)
 
     if (status !== 200 && errorMessage) {
@@ -100,8 +116,13 @@ class AgentChatController {
       })
     }
 
+    let knowledgeDocumentsSystemPrompt = ''
+    if (knowledgeName) {
+      const documents = await ragService.searchDocuments(message, knowledgeName)
+      knowledgeDocumentsSystemPrompt = this.buildKnowledgeDocumentsSystemPrompt(documents)
+    }
+
     try {
-      const history = await supabaseService.getSessionHistory(sessionId)
       const characterInfo: Character | null = await supabaseService.getCharacterInfo(characterId)
       let characterPrompt = ''
       if (characterInfo) {
@@ -110,10 +131,11 @@ class AgentChatController {
 
       const messageList = this.buildMessages(
         `<task>${message}</task>`,
-        history,
+        [],
         {
           reactSystemPrompt: this.agent.getReActSystemPrompt(),
           characterSystemPrompt: characterPrompt,
+          knowledgeDocumentsSystemPrompt,
         },
       )
 
@@ -154,7 +176,7 @@ class AgentChatController {
    * 流式聊天请求函数
    */
   public async streamChat(req: Request, res: Response): Promise<void> {
-    const { sessionId, characterId, message } = req.body as ChatRequestBody
+    const { sessionId, characterId, message, knowledgeName } = req.body as ChatRequestBody
     const { status, errorMessage } = this.validateChatRequest(req.body)
 
     if (status !== 200 && errorMessage) {
@@ -162,6 +184,12 @@ class AgentChatController {
         message: errorMessage,
       })
       return
+    }
+
+    let knowledgeDocumentsSystemPrompt = ''
+    if (knowledgeName) {
+      const documents = await ragService.searchDocuments(message, knowledgeName)
+      knowledgeDocumentsSystemPrompt = this.buildKnowledgeDocumentsSystemPrompt(documents)
     }
 
     try {
@@ -174,7 +202,6 @@ class AgentChatController {
         'Access-Control-Allow-Headers': 'Cache-Control',
       })
 
-      const history = await supabaseService.getSessionHistory(sessionId)
       const characterInfo: Character | null = await supabaseService.getCharacterInfo(characterId)
       let characterPrompt = ''
       if (characterInfo) {
@@ -183,10 +210,11 @@ class AgentChatController {
 
       const messageList = this.buildMessages(
         `<task>${message}</task>`,
-        history,
+        [],
         {
           reactSystemPrompt: this.agent.getReActSystemPrompt(),
           characterSystemPrompt: characterPrompt,
+          knowledgeDocumentsSystemPrompt,
         },
       )
 

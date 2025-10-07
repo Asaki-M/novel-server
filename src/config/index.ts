@@ -15,6 +15,9 @@ interface Config {
     name: string
     referer: string
   }
+  ragServer: {
+    baseUrl?: string
+  } | null
 }
 
 const config: Config = {
@@ -27,6 +30,9 @@ const config: Config = {
   app: {
     name: 'Novel Server Chat API',
     referer: process.env['APP_REFERER'] ?? 'http://localhost:3000',
+  },
+  ragServer: {
+    baseUrl: process.env['RAG_SERVER_BASE_URL'] ?? '',
   },
 }
 
